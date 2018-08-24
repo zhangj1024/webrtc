@@ -321,7 +321,7 @@ class _opaque_connection {
   // Just calls the stored "emitter" function pointer stored at construction
   // time.
   template <typename... Args>
-  void emit(Args... args) const {
+  void Emit(Args... args) const {
     typedef void (*em_t)(const _opaque_connection*, Args...);
     union_caster<emit_t, em_t> caster;
     caster.from = pemit;
@@ -552,17 +552,17 @@ class signal_with_thread_policy : public _signal_base<mt_policy> {
     pclass->signal_connect(static_cast<_signal_base_interface*>(this));
   }
 
-  void emit(Args... args) {
+  void Emit(Args... args) {
     lock_block<mt_policy> lock(this);
     this->m_current_iterator = this->m_connected_slots.begin();
     while (this->m_current_iterator != this->m_connected_slots.end()) {
       _opaque_connection const& conn = *this->m_current_iterator;
       ++(this->m_current_iterator);
-      conn.emit<Args...>(args...);
+      conn.Emit<Args...>(args...);
     }
   }
 
-  void operator()(Args... args) { emit(args...); }
+  void operator()(Args... args) { Emit(args...); }
 };
 
 // Alias with default thread policy. Needed because both default arguments

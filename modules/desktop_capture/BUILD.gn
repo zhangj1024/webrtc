@@ -309,6 +309,10 @@ rtc_static_library("desktop_capture_generic") {
     "window_finder.h",
     "window_finder_win.cc",
     "window_finder_win.h",
+    "null_capture.cc",
+    "null_capture.h",
+    "win_video_capture.cc",
+    "win_video_capture.h",
   ]
 
   if (build_with_mozilla) {

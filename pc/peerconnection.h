@@ -269,6 +269,11 @@ class PeerConnection : public PeerConnectionInternal,
   }
   void RequestUsagePatternReportForTesting();
 
+  void SetChannelEnable(cricket::MediaType type, bool send);
+
+  void EnableSendVideo(bool enable) override;
+  void EnableSendAudio(bool enable) override;
+
  protected:
   ~PeerConnection() override;
 
@@ -315,6 +320,8 @@ class PeerConnection : public PeerConnectionInternal,
 
   rtc::scoped_refptr<RtpTransceiverProxyWithInternal<RtpTransceiver>>
   GetFirstAudioTransceiver() const;
+  rtc::scoped_refptr<RtpTransceiverProxyWithInternal<RtpTransceiver>>
+  GetFirstVideoTransceiver() const;
 
   void CreateAudioReceiver(MediaStreamInterface* stream,
                            const RtpSenderInfo& remote_sender_info);
@@ -1039,6 +1046,11 @@ class PeerConnection : public PeerConnectionInternal,
 
   int usage_event_accumulator_ = 0;
   bool return_histogram_very_quickly_ = false;
+
+  bool enavleVideoSend_ = true;
+  bool enavleVideoReceive_ = true;
+  bool enavleAudioSend_ = true;
+  bool enavleAudioReceive_ = true;
 };
 
 }  // namespace webrtc

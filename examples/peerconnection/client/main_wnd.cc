@@ -111,7 +111,11 @@ bool MainWnd::Create() {
                 TRUE);
 
   CreateChildWindows();
-  SwitchToConnectUI();
+#if TestOnlyLocal
+  SwitchToStreamingUI();
+#else
+  SwitchToConnectUI(false);
+#endif
 
   return wnd_ != NULL;
 }
@@ -127,6 +131,9 @@ bool MainWnd::Destroy() {
 
 void MainWnd::RegisterObserver(MainWndCallback* callback) {
   callback_ = callback;
+#if TestOnlyLocal
+  callback_->ConnectToPeer(11);
+#endif
 }
 
 bool MainWnd::IsWindow() {
@@ -159,18 +166,18 @@ bool MainWnd::PreTranslateMessage(MSG* msg) {
   return ret;
 }
 
-void MainWnd::SwitchToConnectUI() {
+void MainWnd::SwitchToConnectUI(bool exit_connect) {
   RTC_DCHECK(IsWindow());
   LayoutPeerListUI(false);
   ui_ = CONNECT_TO_SERVER;
   LayoutConnectUI(true);
   ::SetFocus(edit1_);
 
-  if (auto_connect_)
+  if (!exit_connect && auto_connect_)
     ::PostMessage(button_, BM_CLICK, 0, 0);
 }
 
-void MainWnd::SwitchToPeerList(const Peers& peers) {
+void MainWnd::SwitchToPeerList(const Peers& peers, bool exit_call) {
   LayoutConnectUI(false);
 
   ::SendMessage(listbox_, LB_RESETCONTENT, 0, 0);
@@ -184,7 +191,7 @@ void MainWnd::SwitchToPeerList(const Peers& peers) {
   LayoutPeerListUI(true);
   ::SetFocus(listbox_);
 
-  if (auto_call_ && peers.begin() != peers.end()) {
+  if (!exit_call && auto_call_ && peers.begin() != peers.end()) {
     // Get the number of items in the list
     LRESULT count = ::SendMessage(listbox_, LB_GETCOUNT, 0, 0);
     if (count != LB_ERR) {
@@ -234,6 +241,7 @@ void MainWnd::QueueUIThreadCallback(int msg_id, void* data) {
                       reinterpret_cast<LPARAM>(data));
 }
 
+#if 0
 void MainWnd::OnPaint() {
   PAINTSTRUCT ps;
   ::BeginPaint(handle(), &ps);
@@ -241,17 +249,122 @@ void MainWnd::OnPaint() {
   RECT rc;
   ::GetClientRect(handle(), &rc);
 
-  VideoRenderer* local_renderer = local_renderer_.get();
-  VideoRenderer* remote_renderer = remote_renderer_.get();
-  if (ui_ == STREAMING && remote_renderer && local_renderer) {
-    AutoLock<VideoRenderer> local_lock(local_renderer);
-    AutoLock<VideoRenderer> remote_lock(remote_renderer);
+  if (ui_ != STREAMING) {
+    HBRUSH brush = ::CreateSolidBrush(::GetSysColor(COLOR_WINDOW));
+    ::FillRect(ps.hdc, &rc, brush);
+    ::DeleteObject(brush);
+  } else {
+    HDC dc_mem = ::CreateCompatibleDC(ps.hdc);
+    ::SetStretchBltMode(dc_mem, HALFTONE);
 
-    const BITMAPINFO& bmi = remote_renderer->bmi();
+    // Set the map mode so that the ratio will be maintained for us.
+    HDC all_dc[] = {ps.hdc, dc_mem};
+    for (size_t i = 0; i < arraysize(all_dc); ++i) {
+      SetMapMode(all_dc[i], MM_ISOTROPIC);
+      //       SetWindowExtEx(all_dc[i], width, height, NULL);
+      SetWindowExtEx(all_dc[i], rc.right, rc.bottom, NULL);
+      SetViewportExtEx(all_dc[i], rc.right, rc.bottom, NULL);
+    }
+
+    HBITMAP bmp_mem = ::CreateCompatibleBitmap(ps.hdc, rc.right, rc.bottom);
+    HGDIOBJ bmp_old = ::SelectObject(dc_mem, bmp_mem);
+
+    POINT logical_area = {rc.right, rc.bottom};
+    DPtoLP(ps.hdc, &logical_area, 1);
+
+    HBRUSH brush = ::CreateSolidBrush(RGB(0, 0, 0));
+    RECT logical_rect = {0, 0, logical_area.x, logical_area.y};
+    ::FillRect(dc_mem, &logical_rect, brush);
+    ::DeleteObject(brush);
+
+    auto doRender = [dc_mem](std::unique_ptr<VideoRenderer>& render, RECT rc) {
+      VideoRenderer* pRender = render.get();
+      if (pRender) {
+        AutoLock<VideoRenderer> renderlock(pRender);
+
+        const uint8_t* image = pRender->image();
+        if (image != NULL) {
+          const BITMAPINFO& bmi = pRender->bmi();
+          int height = abs(bmi.bmiHeader.biHeight);
+          int width = bmi.bmiHeader.biWidth;
+
+          int x = ((rc.right - rc.left) / 2) - (width / 2) + rc.left;
+          int y = ((rc.bottom - rc.top) / 2) - (height / 2);
+
+          StretchDIBits(dc_mem, x, y, width, height, 0, 0, width, height, image,
+                        &bmi, DIB_RGB_COLORS, SRCCOPY);
+        }
+      }
+    };
+
+    RECT remoteRect = rc;
+    remoteRect.right = rc.right / 2;
+    doRender(remote_renderer_, remoteRect);
+
+    RECT localRect = rc;
+    localRect.left = rc.left + (rc.right - rc.left) / 2;
+    doRender(local_renderer_, localRect);
+
+    BitBlt(ps.hdc, 0, 0, logical_area.x, logical_area.y, dc_mem, 0, 0, SRCCOPY);
+
+    auto doText = [ps](std::unique_ptr<VideoRenderer>& render, bool local,
+                       RECT rc) {
+      std::string text;
+      if (local) {
+        text += "local";
+      } else {
+        text += "remote";
+      }
+
+      if (render == NULL) {
+        text += kConnecting;
+      } else if (!render->image()) {
+        if (local) {
+          text += kNoVideoStreams;
+        } else {
+          text += kNoIncomingStream;
+        }
+      }
+
+      TextOutA(ps.hdc, rc.left + (rc.right - rc.left) / 2, rc.top, text.data(),
+               text.length());
+    };
+
+    doText(remote_renderer_, false, remoteRect);
+    doText(local_renderer_, true, localRect);
+
+    // Cleanup.
+    ::SelectObject(dc_mem, bmp_old);
+    ::DeleteObject(bmp_mem);
+    ::DeleteDC(dc_mem);
+  }
+
+  ::EndPaint(handle(), &ps);
+}
+#else
+void MainWnd::OnPaint() {
+  PAINTSTRUCT ps;
+  ::BeginPaint(handle(), &ps);
+
+  RECT rc;
+  ::GetClientRect(handle(), &rc);
+
+#if TestOnlyLocal
+  VideoRenderer* render = local_renderer_.get();
+  VideoRenderer* otherRender = remote_renderer_.get();
+#else
+  VideoRenderer* render = remote_renderer_.get();
+  VideoRenderer* otherRender = local_renderer_.get();
+#endif
+
+  if (ui_ == STREAMING && render) {
+    AutoLock<VideoRenderer> renderlock(render);
+
+    const BITMAPINFO& bmi = render->bmi();
     int height = abs(bmi.bmiHeader.biHeight);
     int width = bmi.bmiHeader.biWidth;
 
-    const uint8_t* image = remote_renderer->image();
+    const uint8_t* image = render->image();
     if (image != NULL) {
       HDC dc_mem = ::CreateCompatibleDC(ps.hdc);
       ::SetStretchBltMode(dc_mem, HALFTONE);
@@ -282,15 +395,19 @@ void MainWnd::OnPaint() {
                     &bmi, DIB_RGB_COLORS, SRCCOPY);
 
       if ((rc.right - rc.left) > 200 && (rc.bottom - rc.top) > 200) {
-        const BITMAPINFO& bmi = local_renderer->bmi();
-        image = local_renderer->image();
-        int thumb_width = bmi.bmiHeader.biWidth / 4;
-        int thumb_height = abs(bmi.bmiHeader.biHeight) / 4;
-        StretchDIBits(dc_mem, logical_area.x - thumb_width - 10,
-                      logical_area.y - thumb_height - 10, thumb_width,
-                      thumb_height, 0, 0, bmi.bmiHeader.biWidth,
-                      -bmi.bmiHeader.biHeight, image, &bmi, DIB_RGB_COLORS,
-                      SRCCOPY);
+		if (otherRender) {
+         AutoLock<VideoRenderer> ohterRenderlock(otherRender);
+         const BITMAPINFO& bmi = otherRender->bmi();
+         image = otherRender->image();
+
+         int thumb_width = bmi.bmiHeader.biWidth / 4;
+         int thumb_height = abs(bmi.bmiHeader.biHeight) / 4;
+         StretchDIBits(dc_mem, logical_area.x - thumb_width - 10,
+                       logical_area.y - thumb_height - 10, thumb_width,
+                       thumb_height, 0, 0, bmi.bmiHeader.biWidth,
+                       -bmi.bmiHeader.biHeight, image, &bmi, DIB_RGB_COLORS,
+                       SRCCOPY);
+       }
       }
 
       BitBlt(ps.hdc, 0, 0, logical_area.x, logical_area.y, dc_mem, 0, 0,
@@ -311,7 +428,7 @@ void MainWnd::OnPaint() {
       ::SetBkMode(ps.hdc, TRANSPARENT);
 
       std::string text(kConnecting);
-      if (!local_renderer->image()) {
+      if (!local_renderer_->image()) {
         text += kNoVideoStreams;
       } else {
         text += kNoIncomingStream;
@@ -328,6 +445,7 @@ void MainWnd::OnPaint() {
 
   ::EndPaint(handle(), &ps);
 }
+#endif
 
 void MainWnd::OnDestroyed() {
   PostQuitMessage(0);

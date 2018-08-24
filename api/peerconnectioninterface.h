@@ -1013,6 +1013,9 @@ class PeerConnectionInterface : public rtc::RefCountInterface {
   // thus the observer object can be safely destroyed.
   virtual void Close() = 0;
 
+  virtual void EnableSendVideo(bool enable) = 0;
+  virtual void EnableSendAudio(bool enable) = 0;
+
  protected:
   // Dtor protected as objects shouldn't be deleted via this interface.
   ~PeerConnectionInterface() override = default;

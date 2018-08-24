@@ -58,6 +58,8 @@ class Conductor : public webrtc::PeerConnectionObserver,
   void EnsureStreamingUI();
   void AddTracks();
   std::unique_ptr<cricket::VideoCapturer> OpenVideoCaptureDevice();
+  std::unique_ptr<cricket::VideoCapturer> OpenWinCapture();
+  std::unique_ptr<cricket::VideoCapturer> OpenNullVideoCapture();
 
   //
   // PeerConnectionObserver implementation.

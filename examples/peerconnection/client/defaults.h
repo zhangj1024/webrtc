@@ -26,4 +26,10 @@ std::string GetPeerConnectionString();
 std::string GetDefaultServerName();
 std::string GetPeerName();
 
+#define TestScreen	0
+#define TestWindow	0
+#define TestCursor	0
+#define TestMute	0
+
+#define TestOnlyLocal 0
 #endif  // EXAMPLES_PEERCONNECTION_CLIENT_DEFAULTS_H_

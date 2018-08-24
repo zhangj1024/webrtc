@@ -14,8 +14,10 @@
 
 #include "modules/desktop_capture/desktop_geometry.h"
 #include "rtc_base/constructormagic.h"
+#include "modules/desktop_capture/desktop_capturer.h"
 
 namespace webrtc {
+bool GetWindowList(DesktopCapturer::SourceList* sources);
 
 // Outputs the window rect. The returned DesktopRect is in system coordinates,
 // i.e. the primary monitor on the system always starts from (0, 0). This

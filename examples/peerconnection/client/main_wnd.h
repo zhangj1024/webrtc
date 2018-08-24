@@ -57,8 +57,8 @@ class MainWindow {
 
   virtual UI current_ui() = 0;
 
-  virtual void SwitchToConnectUI() = 0;
-  virtual void SwitchToPeerList(const Peers& peers) = 0;
+  virtual void SwitchToConnectUI(bool exit_connect) = 0;
+  virtual void SwitchToPeerList(const Peers& peers, bool exit_call) = 0;
   virtual void SwitchToStreamingUI() = 0;
 
   virtual void StartLocalRenderer(webrtc::VideoTrackInterface* local_video) = 0;
@@ -89,8 +89,8 @@ class MainWnd : public MainWindow {
 
   virtual void RegisterObserver(MainWndCallback* callback);
   virtual bool IsWindow();
-  virtual void SwitchToConnectUI();
-  virtual void SwitchToPeerList(const Peers& peers);
+  virtual void SwitchToConnectUI(bool exit_connect);
+  virtual void SwitchToPeerList(const Peers& peers, bool exit_call);
   virtual void SwitchToStreamingUI();
   virtual void MessageBox(const char* caption, const char* text, bool is_error);
   virtual UI current_ui() { return ui_; }

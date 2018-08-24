@@ -14,11 +14,90 @@
 #include "rtc_base/checks.h"
 #include "rtc_base/logging.h"
 #include "rtc_base/win32.h"
+#include "rtc_base/stringutils.h"
 
 namespace webrtc {
 
 // Prefix used to match the window class for Chrome windows.
 const wchar_t kChromeWindowClassPrefix[] = L"Chrome_WidgetWin_";
+
+
+BOOL CALLBACK WindowsEnumerationHandler(HWND hwnd, LPARAM param) {
+  DesktopCapturer::SourceList* list =
+      reinterpret_cast<DesktopCapturer::SourceList*>(param);
+
+  // Skip windows that are invisible, minimized, have no title, or are owned,
+  // unless they have the app window style set.
+  int len = GetWindowTextLength(hwnd);
+  HWND owner = GetWindow(hwnd, GW_OWNER);
+  LONG exstyle = GetWindowLong(hwnd, GWL_EXSTYLE);
+  if (len == 0 || IsIconic(hwnd) || !IsWindowVisible(hwnd) ||
+      (owner && !(exstyle & WS_EX_APPWINDOW))) {
+    return TRUE;
+  }
+
+  // Skip the Program Manager window and the Start button.
+  const size_t kClassLength = 256;
+  WCHAR class_name[kClassLength];
+  const int class_name_length = GetClassName(hwnd, class_name, kClassLength);
+  RTC_DCHECK(class_name_length)
+      << "Error retrieving the application's class name";
+
+  // Skip Program Manager window and the Start button. This is the same logic
+  // that's used in Win32WindowPicker in libjingle. Consider filtering other
+  // windows as well (e.g. toolbars).
+  if (wcscmp(class_name, L"Progman") == 0 || wcscmp(class_name, L"Button") == 0)
+    return TRUE;
+
+  // Windows 8 introduced a "Modern App" identified by their class name being
+  // either ApplicationFrameWindow or windows.UI.Core.coreWindow. The
+  // associated windows cannot be captured, so we skip them.
+  // http://crbug.com/526883.
+  if (rtc::IsWindows8OrLater() &&
+      (wcscmp(class_name, L"ApplicationFrameWindow") == 0 ||
+       wcscmp(class_name, L"Windows.UI.Core.CoreWindow") == 0)) {
+    return TRUE;
+  }
+
+  DesktopCapturer::Source window;
+  window.id = reinterpret_cast<WindowId>(hwnd);
+
+  const size_t kTitleLength = 500;
+  WCHAR window_title[kTitleLength];
+  // Truncate the title if it's longer than kTitleLength.
+  GetWindowText(hwnd, window_title, kTitleLength);
+  window.title = rtc::ToUtf8(window_title);
+
+  // Skip windows when we failed to convert the title or it is empty.
+  if (window.title.empty())
+    return TRUE;
+
+  list->push_back(window);
+
+  return TRUE;
+}
+
+bool GetWindowList(DesktopCapturer::SourceList* sources) {
+  DesktopCapturer::SourceList result;
+  LPARAM param = reinterpret_cast<LPARAM>(&result);
+  // EnumWindows only enumerates root windows.
+  if (!EnumWindows(&WindowsEnumerationHandler, param))
+    return false;
+
+  WindowCaptureHelperWin window_capture_helper_;
+
+  for (auto it = result.begin(); it != result.end();) {
+    if (!window_capture_helper_.IsWindowOnCurrentDesktop(
+            reinterpret_cast<HWND>(it->id))) {
+      it = result.erase(it);
+    } else {
+      ++it;
+    }
+  }
+  sources->swap(result);
+
+  return true;
+}
 
 bool GetWindowRect(HWND window, DesktopRect* result) {
   RECT rect;

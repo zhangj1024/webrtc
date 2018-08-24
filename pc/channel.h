@@ -180,6 +180,12 @@ class BaseChannel : public rtc::MessageHandler,
     transport_name_ = transport_name;
   }
 
+  bool EnableSend() const { return enableSend_; }
+  void SetEnableSend(bool enable);
+
+  bool EnableReceive() const { return enableReceive_; }
+  void SetEnableReceive(bool enable);
+
  protected:
   virtual MediaChannel* media_channel() const { return media_channel_.get(); }
 
@@ -236,6 +242,10 @@ class BaseChannel : public rtc::MessageHandler,
 
   void EnableMedia_w();
   void DisableMedia_w();
+  void EnableSend_w();
+  void DisableSend_w();
+  void EnableReceive_w();
+  void DisableReceive_w();
 
   // Performs actions if the RTP/RTCP writable state changed. This should
   // be called whenever a channel's writable state changes or when RTCP muxing
@@ -330,6 +340,9 @@ class BaseChannel : public rtc::MessageHandler,
       webrtc::RtpTransceiverDirection::kInactive;
 
   webrtc::RtpDemuxerCriteria demuxer_criteria_;
+
+  bool enableSend_ = true;
+  bool enableReceive_ = true;
 };
 
 // VoiceChannel is a specialization that adds support for early media, DTMF,

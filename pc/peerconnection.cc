@@ -57,14 +57,14 @@
 using cricket::ContentInfo;
 using cricket::ContentInfos;
 using cricket::MediaContentDescription;
-using cricket::SessionDescription;
 using cricket::MediaProtocolType;
+using cricket::SessionDescription;
 using cricket::TransportInfo;
 
 using cricket::LOCAL_PORT_TYPE;
-using cricket::STUN_PORT_TYPE;
-using cricket::RELAY_PORT_TYPE;
 using cricket::PRFLX_PORT_TYPE;
+using cricket::RELAY_PORT_TYPE;
+using cricket::STUN_PORT_TYPE;
 
 namespace webrtc {
 
@@ -3211,6 +3211,16 @@ PeerConnection::GetFirstAudioTransceiver() const {
   return nullptr;
 }
 
+rtc::scoped_refptr<RtpTransceiverProxyWithInternal<RtpTransceiver>>
+PeerConnection::GetFirstVideoTransceiver() const {
+  for (auto transceiver : transceivers_) {
+    if (transceiver->media_type() == cricket::MEDIA_TYPE_VIDEO) {
+      return transceiver;
+    }
+  }
+  return nullptr;
+}
+
 bool PeerConnection::StartRtcEventLog(rtc::PlatformFile file,
                                       int64_t max_size_bytes) {
   // TODO(eladalon): It would be better to not allow negative values into PC.
@@ -5365,11 +5375,43 @@ void PeerConnection::OnTransportControllerDtlsHandshakeError(
       static_cast<int>(rtc::SSLHandshakeError::MAX_VALUE));
 }
 
+auto EnableChannelSend = [](cricket::BaseChannel* channel, bool enableSend) {
+  if (!channel) {
+    return;
+  }
+  if (channel->EnableSend() != enableSend) {
+    channel->SetEnableSend(enableSend);
+  }
+};
+
+auto EnableChannelRecv = [](cricket::BaseChannel* channel, bool enableRecv) {
+  if (!channel) {
+    return;
+  }
+  if (channel->EnableReceive() != enableRecv) {
+    channel->SetEnableReceive(enableRecv);
+  }
+};
+
+auto EnableChanne =
+    [](cricket::BaseChannel* channel, bool enableSend, bool enableRecv) {
+      EnableChannelSend(channel, enableSend);
+      EnableChannelRecv(channel, enableRecv);
+    };
+
 void PeerConnection::EnableSending() {
   for (auto transceiver : transceivers_) {
     cricket::BaseChannel* channel = transceiver->internal()->channel();
-    if (channel && !channel->enabled()) {
-      channel->Enable(true);
+    if (channel) {
+      if (!channel->enabled()) {
+        channel->Enable(true);
+      }
+
+      if (transceiver->media_type() == cricket::MEDIA_TYPE_VIDEO) {
+        EnableChanne(channel, enavleVideoSend_, enavleVideoReceive_);
+      } else if (transceiver->media_type() == cricket::MEDIA_TYPE_AUDIO) {
+        EnableChanne(channel, enavleAudioSend_, enavleAudioReceive_);
+      }
     }
   }
 
@@ -6310,6 +6352,27 @@ void PeerConnection::ClearStatsCache() {
 void PeerConnection::RequestUsagePatternReportForTesting() {
   signaling_thread()->Post(RTC_FROM_HERE, this, MSG_REPORT_USAGE_PATTERN,
                            nullptr);
+}
+
+void PeerConnection::SetChannelEnable(cricket::MediaType type, bool send) {
+  for (auto transceiver : transceivers_) {
+    if (transceiver->media_type() == type) {
+      cricket::BaseChannel* channel = transceiver->internal()->channel();
+      if (channel) {
+        channel->SetEnableSend(send);
+      }
+    }
+  }
+}
+
+void PeerConnection::EnableSendVideo(bool enable) {
+  enavleVideoSend_ = enable;
+  EnableChannelSend(GetFirstVideoTransceiver()->internal()->channel(), enable);
+}
+
+void PeerConnection::EnableSendAudio(bool enable) {
+  enavleAudioSend_ = enable;
+  EnableChannelSend(GetFirstAudioTransceiver()->internal()->channel(), enable);
 }
 
 }  // namespace webrtc

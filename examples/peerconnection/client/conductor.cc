@@ -88,12 +88,12 @@ bool Conductor::InitializePeerConnection() {
     DeletePeerConnection();
     return false;
   }
-
+#if !TestOnlyLocal
   if (!CreatePeerConnection(/*dtls=*/true)) {
     main_wnd_->MessageBox("Error", "CreatePeerConnection failed", true);
     DeletePeerConnection();
   }
-
+#endif
   AddTracks();
 
   return peer_connection_ != nullptr;
@@ -196,7 +196,7 @@ void Conductor::OnIceCandidate(const webrtc::IceCandidateInterface* candidate) {
 
 void Conductor::OnSignedIn() {
   RTC_LOG(INFO) << __FUNCTION__;
-  main_wnd_->SwitchToPeerList(client_->peers());
+  main_wnd_->SwitchToPeerList(client_->peers(), false);
 }
 
 void Conductor::OnDisconnected() {
@@ -205,14 +205,14 @@ void Conductor::OnDisconnected() {
   DeletePeerConnection();
 
   if (main_wnd_->IsWindow())
-    main_wnd_->SwitchToConnectUI();
+    main_wnd_->SwitchToConnectUI(true);
 }
 
 void Conductor::OnPeerConnected(int id, const std::string& name) {
   RTC_LOG(INFO) << __FUNCTION__;
   // Refresh the list if we're showing it.
   if (main_wnd_->current_ui() == MainWindow::LIST_PEERS)
-    main_wnd_->SwitchToPeerList(client_->peers());
+    main_wnd_->SwitchToPeerList(client_->peers(), false);
 }
 
 void Conductor::OnPeerDisconnected(int id) {
@@ -223,7 +223,7 @@ void Conductor::OnPeerDisconnected(int id) {
   } else {
     // Refresh the list if we're showing it.
     if (main_wnd_->current_ui() == MainWindow::LIST_PEERS)
-      main_wnd_->SwitchToPeerList(client_->peers());
+      main_wnd_->SwitchToPeerList(client_->peers(), true);
   }
 }
 
@@ -363,13 +363,57 @@ void Conductor::ConnectToPeer(int peer_id) {
     return;
   }
 
+#if TestOnlyLocal
+  InitializePeerConnection();
+#else
   if (InitializePeerConnection()) {
     peer_id_ = peer_id;
     peer_connection_->CreateOffer(
         this, webrtc::PeerConnectionInterface::RTCOfferAnswerOptions());
+
+    peer_connection_->EnableSendVideo(true);
+    peer_connection_->EnableSendAudio(true);
+
   } else {
     main_wnd_->MessageBox("Error", "Failed to initialize PeerConnection", true);
   }
+#endif
+}
+
+#include "modules\desktop_capture\null_capture.h"
+#include "modules\desktop_capture\win\screen_capture_utils.cc"
+#include "modules\desktop_capture\win\window_capture_utils.h"
+#include "modules\desktop_capture\win_video_capture.h"
+
+std::unique_ptr<cricket::VideoCapturer> Conductor::OpenWinCapture() {
+  std::unique_ptr<cricket::VideoCapturer> capturer = NULL;
+#if TestScreen
+
+  std::vector<int> device_id;
+  std::vector<std::string> device_names;
+  std::vector<std::string> device_keys;
+  webrtc::GetScreenList(&device_id, &device_names, &device_keys);
+
+  if (device_id.size() == 0) {
+    return NULL;
+  }
+
+  std::wstring device_key;
+  std::string key = device_keys[0];
+  int id = device_id[0];
+  device_key.assign(key.begin(), key.end());
+
+  webrtc::DesktopRect rect = webrtc::GetScreenRect(id, device_key);
+  capturer = webrtc::WinVideoCapture::CreateScreenVideoCapturer(rect, id);
+#elif TestWindow
+  webrtc::DesktopCapturer::SourceList sources;
+  webrtc::GetWindowList(&sources);
+  capturer = webrtc::WinVideoCapture::CreateWindowVideoCapturer(sources[1].id);
+#else
+  capturer = webrtc::NullCaputre::CreateNullCapturer();
+#endif
+
+  return std::unique_ptr<cricket::VideoCapturer>(std::move(capturer));
 }
 
 std::unique_ptr<cricket::VideoCapturer> Conductor::OpenVideoCaptureDevice() {
@@ -402,35 +446,54 @@ std::unique_ptr<cricket::VideoCapturer> Conductor::OpenVideoCaptureDevice() {
   return capturer;
 }
 
+std::unique_ptr<cricket::VideoCapturer> Conductor::OpenNullVideoCapture() {
+  return webrtc::NullCaputre::CreateNullCapturer();
+}
+
 void Conductor::AddTracks() {
+#if !TestOnlyLocal
   if (!peer_connection_->GetSenders().empty()) {
     return;  // Already added tracks.
   }
+#endif
 
+#if !TestMute
   rtc::scoped_refptr<webrtc::AudioTrackInterface> audio_track(
       peer_connection_factory_->CreateAudioTrack(
           kAudioLabel, peer_connection_factory_->CreateAudioSource(
                            cricket::AudioOptions())));
+#if !TestOnlyLocal
   auto result_or_error = peer_connection_->AddTrack(audio_track, {kStreamId});
   if (!result_or_error.ok()) {
     RTC_LOG(LS_ERROR) << "Failed to add audio track to PeerConnection: "
                       << result_or_error.error().message();
   }
+#endif
+#endif
 
   std::unique_ptr<cricket::VideoCapturer> video_device =
+#if TestMute
+      OpenNullVideoCapture();
+#elif TestScreen | TestWindow
+      OpenWinCapture();
+#else
       OpenVideoCaptureDevice();
+#endif
+
   if (video_device) {
     rtc::scoped_refptr<webrtc::VideoTrackInterface> video_track_(
         peer_connection_factory_->CreateVideoTrack(
             kVideoLabel, peer_connection_factory_->CreateVideoSource(
                              std::move(video_device), nullptr)));
     main_wnd_->StartLocalRenderer(video_track_);
-
-    result_or_error = peer_connection_->AddTrack(video_track_, {kStreamId});
+#if !TestOnlyLocal
+    auto result_or_error =
+        peer_connection_->AddTrack(video_track_, {kStreamId});
     if (!result_or_error.ok()) {
       RTC_LOG(LS_ERROR) << "Failed to add video track to PeerConnection: "
                         << result_or_error.error().message();
     }
+#endif
   } else {
     RTC_LOG(LS_ERROR) << "OpenVideoCaptureDevice failed";
   }
@@ -446,7 +509,7 @@ void Conductor::DisconnectFromCurrentPeer() {
   }
 
   if (main_wnd_->IsWindow())
-    main_wnd_->SwitchToPeerList(client_->peers());
+    main_wnd_->SwitchToPeerList(client_->peers(), true);
 }
 
 void Conductor::UIThreadCallback(int msg_id, void* data) {
@@ -457,9 +520,9 @@ void Conductor::UIThreadCallback(int msg_id, void* data) {
 
       if (main_wnd_->IsWindow()) {
         if (client_->is_connected()) {
-          main_wnd_->SwitchToPeerList(client_->peers());
+          main_wnd_->SwitchToPeerList(client_->peers(), true);
         } else {
-          main_wnd_->SwitchToConnectUI();
+          main_wnd_->SwitchToConnectUI(true);
         }
       } else {
         DisconnectFromServer();

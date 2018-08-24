@@ -281,7 +281,7 @@ bool BaseChannel::SetRemoteContent(const MediaContentDescription* content,
 
 bool BaseChannel::IsReadyToReceiveMedia_w() const {
   // Receive data if we are enabled and have local content,
-  return enabled() &&
+  return enabled() && EnableReceive() &&
          webrtc::RtpTransceiverDirectionHasRecv(local_content_direction_);
 }
 
@@ -294,7 +294,7 @@ bool BaseChannel::IsReadyToSendMedia_w() const {
 bool BaseChannel::IsReadyToSendMedia_n() const {
   // Send outgoing data if we are enabled, have local and remote content,
   // and we have had some form of connectivity.
-  return enabled() &&
+  return enabled() && EnableSend() &&
          webrtc::RtpTransceiverDirectionHasRecv(remote_content_direction_) &&
          webrtc::RtpTransceiverDirectionHasSend(local_content_direction_) &&
          was_ever_writable();
@@ -731,6 +731,60 @@ void BaseChannel::SignalSentPacket_n(const rtc::SentPacket& sent_packet) {
 void BaseChannel::SignalSentPacket_w(const rtc::SentPacket& sent_packet) {
   RTC_DCHECK(worker_thread_->IsCurrent());
   SignalSentPacket(sent_packet);
+}
+
+void BaseChannel::SetEnableSend(bool enable) {
+  worker_thread_->Invoke<void>(
+      RTC_FROM_HERE,
+      Bind(enable ? &BaseChannel::EnableSend_w : &BaseChannel::DisableSend_w,
+           this));
+}
+
+void BaseChannel::EnableSend_w() {
+  RTC_DCHECK(worker_thread_ == rtc::Thread::Current());
+  if (enableSend_)
+    return;
+
+  RTC_LOG(LS_INFO) << "Channel send enabled";
+  enableSend_ = true;
+  UpdateMediaSendRecvState_w();
+}
+
+void BaseChannel::DisableSend_w() {
+  RTC_DCHECK(worker_thread_ == rtc::Thread::Current());
+  if (!enableSend_)
+    return;
+
+  RTC_LOG(LS_INFO) << "Channel send disabled";
+  enableSend_ = false;
+  UpdateMediaSendRecvState_w();
+}
+
+void BaseChannel::SetEnableReceive(bool enable) {
+  worker_thread_->Invoke<void>(RTC_FROM_HERE,
+                               Bind(enable ? &BaseChannel::EnableReceive_w
+                                           : &BaseChannel::DisableReceive_w,
+                                    this));
+}
+
+void BaseChannel::EnableReceive_w() {
+  RTC_DCHECK(worker_thread_ == rtc::Thread::Current());
+  if (enableReceive_)
+    return;
+
+  RTC_LOG(LS_INFO) << "Channel receive enabled";
+  enableReceive_ = true;
+  UpdateMediaSendRecvState_w();
+}
+
+void BaseChannel::DisableReceive_w() {
+  RTC_DCHECK(worker_thread_ == rtc::Thread::Current());
+  if (!enableReceive_)
+    return;
+
+  RTC_LOG(LS_INFO) << "Channel receive disabled";
+  enableReceive_ = false;
+  UpdateMediaSendRecvState_w();
 }
 
 VoiceChannel::VoiceChannel(rtc::Thread* worker_thread,

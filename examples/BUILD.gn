@@ -701,7 +701,9 @@ if (is_linux || is_win) {
         "peerconnection/client/main_wnd.h",
       ]
       configs += [ "//build/config/win:windowed" ]
-      deps += [ "../media:rtc_media_base" ]
+      deps += [ "../media:rtc_media_base",
+        "../modules/desktop_capture:desktop_capture",
+        ]
     }
     if (is_linux) {
       sources += [

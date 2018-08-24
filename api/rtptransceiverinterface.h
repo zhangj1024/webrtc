@@ -24,10 +24,10 @@ namespace webrtc {
 
 // https://w3c.github.io/webrtc-pc/#dom-rtcrtptransceiverdirection
 enum class RtpTransceiverDirection {
-  kSendRecv,
-  kSendOnly,
-  kRecvOnly,
-  kInactive
+  kInactive = 0x00,
+  kSendOnly = 0x01,
+  kRecvOnly = 0x02,
+  kSendRecv = 0x03,
 };
 
 // Structure for initializing an RtpTransceiver in a call to

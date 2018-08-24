@@ -141,6 +141,8 @@ PROXY_METHOD2(bool,
               int64_t);
 PROXY_METHOD0(void, StopRtcEventLog)
 PROXY_METHOD0(void, Close)
+PROXY_METHOD1(void, EnableSendVideo, bool)
+PROXY_METHOD1(void, EnableSendAudio, bool)
 END_PROXY_MAP()
 
 }  // namespace webrtc

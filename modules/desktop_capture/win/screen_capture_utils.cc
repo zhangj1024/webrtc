@@ -22,6 +22,46 @@
 
 namespace webrtc {
 
+bool GetScreenList(std::vector<int>* device_id,
+                   std::vector<std::string>* device_names/* = nullptr*/,
+                   std::vector<std::string>* device_keys/* = nullptr*/) {
+  if (device_id) {
+    RTC_DCHECK_EQ(device_id->size(), 0U);
+  }
+  if (device_names) {
+    RTC_DCHECK_EQ(device_names->size(), 0U);
+  }
+  if (device_keys) {
+    RTC_DCHECK_EQ(device_keys->size(), 0U);
+  }
+
+  BOOL enum_result = TRUE;
+  for (int device_index = 0;; ++device_index) {
+    DISPLAY_DEVICE device;
+    device.cb = sizeof(device);
+    enum_result = EnumDisplayDevices(NULL, device_index, &device, 0);
+
+    // |enum_result| is 0 if we have enumerated all devices.
+    if (!enum_result)
+      break;
+
+    // We only care about active displays.
+    if (!(device.StateFlags & DISPLAY_DEVICE_ACTIVE))
+      continue;
+
+    if (device_id) {
+      device_id->push_back(device_index);
+    }
+    if (device_names) {
+      device_names->push_back(rtc::ToUtf8(device.DeviceString));
+    }
+    if (device_keys) {
+      device_keys->push_back(rtc::ToUtf8(device.DeviceKey));
+    }
+  }
+  return true;
+}
+
 bool GetScreenList(DesktopCapturer::SourceList* screens,
                    std::vector<std::string>* device_names /* = nullptr */) {
   RTC_DCHECK_EQ(screens->size(), 0U);

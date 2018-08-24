@@ -23,6 +23,10 @@ namespace webrtc {
 // is provided, it will be filled with the DISPLAY_DEVICE.DeviceName in UTF-8
 // encoding. If this function returns true, consumers can always assume that
 // |screens|[i] and |device_names|[i] indicate the same monitor on the system.
+bool GetScreenList(std::vector<int>* device_id,
+                   std::vector<std::string>* device_names = nullptr,
+                   std::vector<std::string>* device_keys = nullptr);
+
 bool GetScreenList(DesktopCapturer::SourceList* screens,
                    std::vector<std::string>* device_names = nullptr);
 
