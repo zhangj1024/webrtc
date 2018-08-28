@@ -6368,7 +6368,7 @@ void PeerConnection::SetChannelEnable(cricket::MediaType type, bool send) {
 cricket::BaseChannel* GetTransceiverChannel(
     rtc::scoped_refptr<RtpTransceiverProxyWithInternal<RtpTransceiver>>
         rtpTransceiver) {
-  if (!rtpTransceiver || rtpTransceiver->internal()) {
+  if (!rtpTransceiver || !rtpTransceiver->internal()) {
     return NULL;
   }
   return rtpTransceiver->internal()->channel();
