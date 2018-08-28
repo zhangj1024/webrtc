@@ -6365,14 +6365,23 @@ void PeerConnection::SetChannelEnable(cricket::MediaType type, bool send) {
   }
 }
 
+cricket::BaseChannel* GetTransceiverChannel(
+    rtc::scoped_refptr<RtpTransceiverProxyWithInternal<RtpTransceiver>>
+        rtpTransceiver) {
+  if (!rtpTransceiver || rtpTransceiver->internal()) {
+    return NULL;
+  }
+  return rtpTransceiver->internal()->channel();
+};
+
 void PeerConnection::EnableSendVideo(bool enable) {
   enavleVideoSend_ = enable;
-  EnableChannelSend(GetFirstVideoTransceiver()->internal()->channel(), enable);
+  EnableChannelSend(GetTransceiverChannel(GetFirstVideoTransceiver()), enable);
 }
 
 void PeerConnection::EnableSendAudio(bool enable) {
   enavleAudioSend_ = enable;
-  EnableChannelSend(GetFirstAudioTransceiver()->internal()->channel(), enable);
+  EnableChannelSend(GetTransceiverChannel(GetFirstAudioTransceiver()), enable);
 }
 
 }  // namespace webrtc
