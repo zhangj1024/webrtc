@@ -23,10 +23,10 @@ class WinVideoCaptureThread : public rtc::AutoThread,
   WinVideoCaptureThread(DesktopCapturer* capturer)
       : capturer_(capturer), finished_(false), running_(false){};
 
-  virtual ~WinVideoCaptureThread(){};
+  ~WinVideoCaptureThread() override {};
 
  protected:
-  virtual void Run() {
+  void Run() override {
     // fps=15
     static const int CaptureInterval = 1000 / 15;
     running_ = true;
@@ -39,7 +39,7 @@ class WinVideoCaptureThread : public rtc::AutoThread,
   };
 
  public:
-  virtual void OnMessage(rtc::Message* msg){};
+  void OnMessage(rtc::Message* msg) override {};
   inline bool Finished() const { return finished_; };
   inline bool Running() const { return running_; };
 

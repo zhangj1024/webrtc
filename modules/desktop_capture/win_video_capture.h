@@ -23,7 +23,7 @@ class WinVideoCapture : public cricket::VideoCapturer,
   sigslot::signal1<WinVideoCapture*> SignalDestroyed;
 
   WinVideoCapture(DesktopCapturer* capture);
-  ~WinVideoCapture();
+  ~WinVideoCapture() override;
 
   static std::unique_ptr<cricket::VideoCapturer> CreateWindowVideoCapturer(
       WindowId windowId);
@@ -41,7 +41,7 @@ class WinVideoCapture : public cricket::VideoCapturer,
   bool IsRunning() override;
   bool IsScreencast() const override;
   bool GetPreferredFourccs(std::vector<uint32_t>* fourccs) override;
-  virtual void OnCaptureResult(
+  void OnCaptureResult(
       DesktopCapturer::Result result,
       std::unique_ptr<DesktopFrame> desktop_frame) override;
 

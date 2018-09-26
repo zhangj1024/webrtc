@@ -5309,7 +5309,7 @@ void PeerConnection::OnTransportControllerDtlsHandshakeError(
       static_cast<int>(rtc::SSLHandshakeError::MAX_VALUE));
 }
 
-auto EnableChannelSend = [](cricket::BaseChannel* channel, bool enableSend) {
+void EnableChannelSend(cricket::BaseChannel* channel, bool enableSend) {
   if (!channel) {
     return;
   }
@@ -5318,7 +5318,7 @@ auto EnableChannelSend = [](cricket::BaseChannel* channel, bool enableSend) {
   }
 };
 
-auto EnableChannelRecv = [](cricket::BaseChannel* channel, bool enableRecv) {
+void EnableChannelRecv(cricket::BaseChannel* channel, bool enableRecv) {
   if (!channel) {
     return;
   }
@@ -5327,11 +5327,12 @@ auto EnableChannelRecv = [](cricket::BaseChannel* channel, bool enableRecv) {
   }
 };
 
-auto EnableChanne =
-    [](cricket::BaseChannel* channel, bool enableSend, bool enableRecv) {
-      EnableChannelSend(channel, enableSend);
-      EnableChannelRecv(channel, enableRecv);
-    };
+void EnableChanne(cricket::BaseChannel* channel,
+                  bool enableSend,
+                  bool enableRecv) {
+  EnableChannelSend(channel, enableSend);
+  EnableChannelRecv(channel, enableRecv);
+};
 
 void PeerConnection::EnableSending() {
   for (auto transceiver : transceivers_) {
