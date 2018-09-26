@@ -20,6 +20,7 @@
 #include "rtc_base/criticalsection.h"
 #include "rtc_base/system/file_wrapper.h"
 #include "rtc_base/timeutils.h"
+#include "common_audio/resampler/include/push_resampler.h"
 
 namespace rtc {
 class PlatformThread;
@@ -129,36 +130,32 @@ class FileAudioDevice : public AudioDeviceGeneric {
 
  private:
   static bool RecThreadFunc(void*);
-  static bool PlayThreadFunc(void*);
   bool RecThreadProcess();
-  bool PlayThreadProcess();
 
-  int32_t _playout_index;
   int32_t _record_index;
   AudioDeviceBuffer* _ptrAudioBuffer;
-  int8_t* _recordingBuffer;  // In bytes.
-  int8_t* _playoutBuffer;    // In bytes.
+  int16_t* _recordingBuffer;  // In bytes.
   uint32_t _recordingFramesLeft;
-  uint32_t _playoutFramesLeft;
   rtc::CriticalSection _critSect;
 
   size_t _recordingBufferSizeIn10MS;
   size_t _recordingFramesIn10MS;
-  size_t _playoutFramesIn10MS;
+
+  int16_t* _recordingBuffer48000 = NULL;  // In bytes.
+  size_t _recordingBufferSizeIn10MS48000;
+  size_t _recordingFramesIn10MS48000;
+
 
   // TODO(pbos): Make plain members instead of pointers and stop resetting them.
   std::unique_ptr<rtc::PlatformThread> _ptrThreadRec;
-  std::unique_ptr<rtc::PlatformThread> _ptrThreadPlay;
 
-  bool _playing;
   bool _recording;
-  int64_t _lastCallPlayoutMillis;
   int64_t _lastCallRecordMillis;
 
-  FileWrapper& _outputFile;
   FileWrapper& _inputFile;
-  std::string _outputFilename;
   std::string _inputFilename;
+
+  PushResampler<int16_t> resampler;
 };
 
 }  // namespace webrtc

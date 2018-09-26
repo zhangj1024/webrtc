@@ -160,6 +160,7 @@ int32_t AudioDeviceModuleImpl::CreatePlatformSpecificObjects() {
   audio_device_.reset(new AudioDeviceDummy());
   RTC_LOG(INFO) << "Dummy Audio APIs will be utilized";
 #elif defined(WEBRTC_DUMMY_FILE_DEVICES)
+  FileAudioDeviceFactory::SetFilenamesToUse("F://1.pcm", "F://1out.pcm");
   audio_device_.reset(FileAudioDeviceFactory::CreateFileAudioDevice());
   if (audio_device_) {
     RTC_LOG(INFO) << "Will use file-playing dummy device.";

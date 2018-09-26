@@ -49,9 +49,9 @@ group("examples") {
     deps += [
       ":peerconnection_client",
       ":peerconnection_server",
-      ":relayserver",
-      ":stunserver",
-      ":turnserver",
+#      ":relayserver",
+#      ":stunserver",
+#      ":turnserver",
     ]
   }
 

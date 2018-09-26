@@ -16,36 +16,26 @@
 
 namespace webrtc {
 
-const int kRecordingFixedSampleRate = 48000;
+const int kRecordingFixedSampleRate = 44100;
 const size_t kRecordingNumChannels = 2;
-const int kPlayoutFixedSampleRate = 48000;
-const size_t kPlayoutNumChannels = 2;
-const size_t kPlayoutBufferSize =
-    kPlayoutFixedSampleRate / 100 * kPlayoutNumChannels * 2;
 const size_t kRecordingBufferSize =
     kRecordingFixedSampleRate / 100 * kRecordingNumChannels * 2;
+
+const int kRecordingFixedSampleRate48000 = 48000;
 
 FileAudioDevice::FileAudioDevice(const char* inputFilename,
                                  const char* outputFilename)
     : _ptrAudioBuffer(NULL),
       _recordingBuffer(NULL),
-      _playoutBuffer(NULL),
       _recordingFramesLeft(0),
-      _playoutFramesLeft(0),
       _recordingBufferSizeIn10MS(0),
       _recordingFramesIn10MS(0),
-      _playoutFramesIn10MS(0),
-      _playing(false),
       _recording(false),
-      _lastCallPlayoutMillis(0),
       _lastCallRecordMillis(0),
-      _outputFile(*FileWrapper::Create()),
       _inputFile(*FileWrapper::Create()),
-      _outputFilename(outputFilename),
       _inputFilename(inputFilename) {}
 
 FileAudioDevice::~FileAudioDevice() {
-  delete &_outputFile;
   delete &_inputFile;
 }
 
@@ -106,7 +96,6 @@ int32_t FileAudioDevice::RecordingDeviceName(uint16_t index,
 
 int32_t FileAudioDevice::SetPlayoutDevice(uint16_t index) {
   if (index == 0) {
-    _playout_index = index;
     return 0;
   }
   return -1;
@@ -131,33 +120,16 @@ int32_t FileAudioDevice::SetRecordingDevice(
 }
 
 int32_t FileAudioDevice::PlayoutIsAvailable(bool& available) {
-  if (_playout_index == 0) {
-    available = true;
-    return _playout_index;
-  }
   available = false;
   return -1;
 }
 
 int32_t FileAudioDevice::InitPlayout() {
-  rtc::CritScope lock(&_critSect);
-
-  if (_playing) {
-    return -1;
-  }
-
-  _playoutFramesIn10MS = static_cast<size_t>(kPlayoutFixedSampleRate / 100);
-
-  if (_ptrAudioBuffer) {
-    // Update webrtc audio buffer with the selected parameters
-    _ptrAudioBuffer->SetPlayoutSampleRate(kPlayoutFixedSampleRate);
-    _ptrAudioBuffer->SetPlayoutChannels(kPlayoutNumChannels);
-  }
   return 0;
 }
 
 bool FileAudioDevice::PlayoutIsInitialized() const {
-  return _playoutFramesIn10MS != 0;
+  return true;
 }
 
 int32_t FileAudioDevice::RecordingIsAvailable(bool& available) {
@@ -177,9 +149,10 @@ int32_t FileAudioDevice::InitRecording() {
   }
 
   _recordingFramesIn10MS = static_cast<size_t>(kRecordingFixedSampleRate / 100);
+  _recordingFramesIn10MS48000 = static_cast<size_t>(kRecordingFixedSampleRate48000 / 100);
 
   if (_ptrAudioBuffer) {
-    _ptrAudioBuffer->SetRecordingSampleRate(kRecordingFixedSampleRate);
+    _ptrAudioBuffer->SetRecordingSampleRate(kRecordingFixedSampleRate48000);
     _ptrAudioBuffer->SetRecordingChannels(kRecordingNumChannels);
   }
   return 0;
@@ -190,86 +163,37 @@ bool FileAudioDevice::RecordingIsInitialized() const {
 }
 
 int32_t FileAudioDevice::StartPlayout() {
-  if (_playing) {
-    return 0;
-  }
-
-  _playing = true;
-  _playoutFramesLeft = 0;
-
-  if (!_playoutBuffer) {
-    _playoutBuffer = new int8_t[kPlayoutBufferSize];
-  }
-  if (!_playoutBuffer) {
-    _playing = false;
-    return -1;
-  }
-
-  // PLAYOUT
-  if (!_outputFilename.empty() &&
-      !_outputFile.OpenFile(_outputFilename.c_str(), false)) {
-    RTC_LOG(LS_ERROR) << "Failed to open playout file: " << _outputFilename;
-    _playing = false;
-    delete[] _playoutBuffer;
-    _playoutBuffer = NULL;
-    return -1;
-  }
-
-  _ptrThreadPlay.reset(new rtc::PlatformThread(
-      PlayThreadFunc, this, "webrtc_audio_module_play_thread"));
-  _ptrThreadPlay->Start();
-  _ptrThreadPlay->SetPriority(rtc::kRealtimePriority);
-
-  RTC_LOG(LS_INFO) << "Started playout capture to output file: "
-                   << _outputFilename;
   return 0;
 }
 
 int32_t FileAudioDevice::StopPlayout() {
-  {
-    rtc::CritScope lock(&_critSect);
-    _playing = false;
-  }
-
-  // stop playout thread first
-  if (_ptrThreadPlay) {
-    _ptrThreadPlay->Stop();
-    _ptrThreadPlay.reset();
-  }
-
-  rtc::CritScope lock(&_critSect);
-
-  _playoutFramesLeft = 0;
-  delete[] _playoutBuffer;
-  _playoutBuffer = NULL;
-  _outputFile.CloseFile();
-
-  RTC_LOG(LS_INFO) << "Stopped playout capture to output file: "
-                   << _outputFilename;
   return 0;
 }
 
 bool FileAudioDevice::Playing() const {
-  return _playing;
+  return true;
 }
 
 int32_t FileAudioDevice::StartRecording() {
   _recording = true;
 
-  // Make sure we only create the buffer once.
-  _recordingBufferSizeIn10MS =
-      _recordingFramesIn10MS * kRecordingNumChannels * 2;
-  if (!_recordingBuffer) {
-    _recordingBuffer = new int8_t[_recordingBufferSizeIn10MS];
-  }
-
   if (!_inputFilename.empty() &&
       !_inputFile.OpenFile(_inputFilename.c_str(), true)) {
     RTC_LOG(LS_ERROR) << "Failed to open audio input file: " << _inputFilename;
     _recording = false;
-    delete[] _recordingBuffer;
-    _recordingBuffer = NULL;
     return -1;
+  }
+
+  // Make sure we only create the buffer once.
+  _recordingBufferSizeIn10MS = _recordingFramesIn10MS * kRecordingNumChannels;
+  if (!_recordingBuffer) {
+    _recordingBuffer = new int16_t[_recordingBufferSizeIn10MS];
+  }
+
+  _recordingBufferSizeIn10MS48000 =
+      _recordingFramesIn10MS48000 * kRecordingNumChannels;
+  if (!_recordingBuffer48000) {
+    _recordingBuffer48000 = new int16_t[_recordingBufferSizeIn10MS48000];
   }
 
   _ptrThreadRec.reset(new rtc::PlatformThread(
@@ -435,43 +359,8 @@ void FileAudioDevice::AttachAudioBuffer(AudioDeviceBuffer* audioBuffer) {
   _ptrAudioBuffer->SetPlayoutChannels(0);
 }
 
-bool FileAudioDevice::PlayThreadFunc(void* pThis) {
-  return (static_cast<FileAudioDevice*>(pThis)->PlayThreadProcess());
-}
-
 bool FileAudioDevice::RecThreadFunc(void* pThis) {
   return (static_cast<FileAudioDevice*>(pThis)->RecThreadProcess());
-}
-
-bool FileAudioDevice::PlayThreadProcess() {
-  if (!_playing) {
-    return false;
-  }
-  int64_t currentTime = rtc::TimeMillis();
-  _critSect.Enter();
-
-  if (_lastCallPlayoutMillis == 0 ||
-      currentTime - _lastCallPlayoutMillis >= 10) {
-    _critSect.Leave();
-    _ptrAudioBuffer->RequestPlayoutData(_playoutFramesIn10MS);
-    _critSect.Enter();
-
-    _playoutFramesLeft = _ptrAudioBuffer->GetPlayoutData(_playoutBuffer);
-    RTC_DCHECK_EQ(_playoutFramesIn10MS, _playoutFramesLeft);
-    if (_outputFile.is_open()) {
-      _outputFile.Write(_playoutBuffer, kPlayoutBufferSize);
-    }
-    _lastCallPlayoutMillis = currentTime;
-  }
-  _playoutFramesLeft = 0;
-  _critSect.Leave();
-
-  int64_t deltaTimeMillis = rtc::TimeMillis() - currentTime;
-  if (deltaTimeMillis < 10) {
-    SleepMs(10 - deltaTimeMillis);
-  }
-
-  return true;
 }
 
 bool FileAudioDevice::RecThreadProcess() {
@@ -480,28 +369,38 @@ bool FileAudioDevice::RecThreadProcess() {
   }
 
   int64_t currentTime = rtc::TimeMillis();
-  _critSect.Enter();
-
-  if (_lastCallRecordMillis == 0 || currentTime - _lastCallRecordMillis >= 10) {
-    if (_inputFile.is_open()) {
-      if (_inputFile.Read(_recordingBuffer, kRecordingBufferSize) > 0) {
-        _ptrAudioBuffer->SetRecordedBuffer(_recordingBuffer,
-                                           _recordingFramesIn10MS);
-      } else {
-        _inputFile.Rewind();
-      }
-      _lastCallRecordMillis = currentTime;
-      _critSect.Leave();
-      _ptrAudioBuffer->DeliverRecordedData();
-      _critSect.Enter();
-    }
+  if (_lastCallRecordMillis == 0) {
+    _lastCallRecordMillis = currentTime;
   }
 
-  _critSect.Leave();
+  int64_t deltaTimeMillis = _lastCallRecordMillis - currentTime;
+  if (deltaTimeMillis > 0) {
+    SleepMs(deltaTimeMillis);
+  }
 
-  int64_t deltaTimeMillis = rtc::TimeMillis() - currentTime;
-  if (deltaTimeMillis < 10) {
-    SleepMs(10 - deltaTimeMillis);
+  if (_inputFile.is_open()) {
+    if (_inputFile.Read(_recordingBuffer, kRecordingBufferSize) > 0) {
+      if (resampler.InitializeIfNeeded(kRecordingFixedSampleRate,
+                                       kRecordingFixedSampleRate48000,
+                                       kRecordingNumChannels) == -1) {
+        FATAL() << "InitializeIfNeeded failed: sample_rate_hz = ";
+      }
+
+      int out_length = resampler.Resample(
+          _recordingBuffer, _recordingBufferSizeIn10MS, _recordingBuffer48000,
+          _recordingBufferSizeIn10MS48000);
+      if (out_length == -1) {
+        FATAL() << "Resample failed: audio_ptr = ";
+        return false;
+      }
+
+      _ptrAudioBuffer->SetRecordedBuffer(_recordingBuffer48000,
+                                         out_length / kRecordingNumChannels);
+    } else {
+      _inputFile.Rewind();
+    }
+    _lastCallRecordMillis += 10;
+    _ptrAudioBuffer->DeliverRecordedData();
   }
 
   return true;
