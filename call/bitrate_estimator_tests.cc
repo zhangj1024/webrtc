@@ -13,6 +13,8 @@
 #include <string>
 
 #include "call/call.h"
+#include "call/fake_network_pipe.h"
+#include "call/simulated_network.h"
 #include "rtc_base/checks.h"
 #include "rtc_base/event.h"
 #include "rtc_base/logging.h"
@@ -106,10 +108,18 @@ class BitrateEstimatorTest : public test::CallTest {
       CreateCalls();
 
       send_transport_.reset(new test::DirectTransport(
-          &task_queue_, sender_call_.get(), payload_type_map_));
+          &task_queue_,
+          absl::make_unique<FakeNetworkPipe>(
+              Clock::GetRealTimeClock(), absl::make_unique<SimulatedNetwork>(
+                                             DefaultNetworkSimulationConfig())),
+          sender_call_.get(), payload_type_map_));
       send_transport_->SetReceiver(receiver_call_->Receiver());
       receive_transport_.reset(new test::DirectTransport(
-          &task_queue_, receiver_call_.get(), payload_type_map_));
+          &task_queue_,
+          absl::make_unique<FakeNetworkPipe>(
+              Clock::GetRealTimeClock(), absl::make_unique<SimulatedNetwork>(
+                                             DefaultNetworkSimulationConfig())),
+          receiver_call_.get(), payload_type_map_));
       receive_transport_->SetReceiver(sender_call_->Receiver());
 
       VideoSendStream::Config video_send_config(send_transport_.get());
@@ -177,7 +187,8 @@ class BitrateEstimatorTest : public test::CallTest {
       VideoReceiveStream::Decoder decoder;
       decoder.decoder = &fake_decoder_;
       decoder.payload_type = test_->GetVideoSendConfig()->rtp.payload_type;
-      decoder.payload_name = test_->GetVideoSendConfig()->rtp.payload_name;
+      decoder.video_format =
+          SdpVideoFormat(test_->GetVideoSendConfig()->rtp.payload_name);
       test_->receive_config_.decoders.clear();
       test_->receive_config_.decoders.push_back(decoder);
       test_->receive_config_.rtp.remote_ssrc =

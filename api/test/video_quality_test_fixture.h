@@ -63,6 +63,7 @@ class VideoQualityTestFixtureInterface {
       bool enabled;
       bool sync_video;
       bool dtx;
+      bool use_real_adm;
     } audio;
     struct Screenshare {
       bool enabled;
@@ -79,7 +80,15 @@ class VideoQualityTestFixtureInterface {
       std::string graph_data_output_filename;
       std::string graph_title;
     } analyzer;
-    NetworkSimulationInterface::SimulatedNetworkConfig pipe;
+    // Deprecated. DO NOT USE. Use config instead. This is not pipe actually,
+    // it is just configuration, that will be passed to default implementation
+    // of simulation layer.
+    DefaultNetworkSimulationConfig pipe;
+    // Config for default simulation implementation. Must be nullopt if
+    // `sender_network` and `receiver_network` in InjectionComponents are
+    // non-null. May be nullopt even if `sender_network` and `receiver_network`
+    // are null; in that case, a default config will be used.
+    absl::optional<DefaultNetworkSimulationConfig> config;
     struct SS {                          // Spatial scalability.
       std::vector<VideoStream> streams;  // If empty, one stream is assumed.
       size_t selected_stream;
@@ -96,6 +105,21 @@ class VideoQualityTestFixtureInterface {
       std::string rtp_dump_name;
       std::string encoded_frame_base_path;
     } logging;
+  };
+
+  // Contains objects, that will be injected on different layers of test
+  // framework to override the behavior of system parts.
+  struct InjectionComponents {
+    InjectionComponents();
+    ~InjectionComponents();
+
+    // Simulations of sender and receiver networks. They must either both be
+    // null (in which case `config` from Params is used), or both be non-null
+    // (in which case `config` from Params must be nullopt).
+    std::unique_ptr<NetworkSimulationInterface> sender_network;
+    std::unique_ptr<NetworkSimulationInterface> receiver_network;
+
+    std::unique_ptr<FecControllerFactoryInterface> fec_controller_factory;
   };
 
   virtual ~VideoQualityTestFixtureInterface() = default;

@@ -21,6 +21,8 @@
 #include "modules/rtp_rtcp/include/rtp_rtcp_defines.h"
 #include "modules/rtp_rtcp/source/rtcp_packet/transport_feedback.h"
 #include "modules/rtp_rtcp/source/rtp_format_video_generic.h"
+#include "modules/rtp_rtcp/source/rtp_generic_frame_descriptor.h"
+#include "modules/rtp_rtcp/source/rtp_generic_frame_descriptor_extension.h"
 #include "modules/rtp_rtcp/source/rtp_header_extensions.h"
 #include "modules/rtp_rtcp/source/rtp_packet_received.h"
 #include "modules/rtp_rtcp/source/rtp_packet_to_send.h"
@@ -59,8 +61,10 @@ const int kVideoRotationExtensionId = 5;
 const size_t kGenericHeaderLength = 1;
 const uint8_t kPayloadData[] = {47, 11, 32, 93, 89};
 const int64_t kDefaultExpectedRetransmissionTimeMs = 125;
+const int kGenericDescriptorId = 10;
 
 using ::testing::_;
+using ::testing::ElementsAre;
 using ::testing::ElementsAreArray;
 using ::testing::Invoke;
 
@@ -84,6 +88,8 @@ class LoopbackTransportTest : public webrtc::Transport {
     receivers_extensions_.Register(kRtpExtensionVideoTiming,
                                    kVideoTimingExtensionId);
     receivers_extensions_.Register(kRtpExtensionMid, kMidExtensionId);
+    receivers_extensions_.Register(kRtpExtensionGenericFrameDescriptor,
+                                   kGenericDescriptorId);
   }
 
   bool SendRtp(const uint8_t* data,
@@ -1842,7 +1848,8 @@ TEST_P(RtpSenderVideoTest, RetransmissionTypesH264) {
 TEST_P(RtpSenderVideoTest, RetransmissionTypesVP8BaseLayer) {
   RTPVideoHeader header;
   header.codec = kVideoCodecVP8;
-  header.vp8().temporalIdx = 0;
+  auto& vp8_header = header.video_type_header.emplace<RTPVideoHeaderVP8>();
+  vp8_header.temporalIdx = 0;
 
   EXPECT_EQ(kDontRetransmit,
             rtp_sender_video_->GetStorageType(
@@ -1874,8 +1881,9 @@ TEST_P(RtpSenderVideoTest, RetransmissionTypesVP8HigherLayers) {
   RTPVideoHeader header;
   header.codec = kVideoCodecVP8;
 
+  auto& vp8_header = header.video_type_header.emplace<RTPVideoHeaderVP8>();
   for (int tid = 1; tid <= kMaxTemporalStreams; ++tid) {
-    header.vp8().temporalIdx = tid;
+    vp8_header.temporalIdx = tid;
 
     EXPECT_EQ(kDontRetransmit, rtp_sender_video_->GetStorageType(
                                    header, kRetransmitOff,
@@ -1938,8 +1946,9 @@ TEST_P(RtpSenderVideoTest, ConditionalRetransmit) {
       (RTPSenderVideo::kTLRateWindowSizeMs + (kFrameIntervalMs / 2)) /
       kFrameIntervalMs;
   constexpr int kPattern[] = {0, 2, 1, 2};
+  auto& vp8_header = header.video_type_header.emplace<RTPVideoHeaderVP8>();
   for (size_t i = 0; i < arraysize(kPattern) * kNumRepetitions; ++i) {
-    header.vp8().temporalIdx = kPattern[i % arraysize(kPattern)];
+    vp8_header.temporalIdx = kPattern[i % arraysize(kPattern)];
     rtp_sender_video_->GetStorageType(header, kSettings, kRttMs);
     fake_clock_.AdvanceTimeMilliseconds(kFrameIntervalMs);
   }
@@ -1948,7 +1957,7 @@ TEST_P(RtpSenderVideoTest, ConditionalRetransmit) {
   // right now. We will wait at most one expected retransmission time before
   // acknowledging that it did not arrive, which means this frame and the next
   // will not be retransmitted.
-  header.vp8().temporalIdx = 1;
+  vp8_header.temporalIdx = 1;
   EXPECT_EQ(StorageType::kDontRetransmit,
             rtp_sender_video_->GetStorageType(header, kSettings, kRttMs));
   fake_clock_.AdvanceTimeMilliseconds(kFrameIntervalMs);
@@ -1964,7 +1973,7 @@ TEST_P(RtpSenderVideoTest, ConditionalRetransmit) {
   // Insert a frame for TL2. We just had frame in TL1, so the next one there is
   // in three frames away. TL0 is still too far in the past. So, allow
   // retransmission.
-  header.vp8().temporalIdx = 2;
+  vp8_header.temporalIdx = 2;
   EXPECT_EQ(StorageType::kAllowRetransmission,
             rtp_sender_video_->GetStorageType(header, kSettings, kRttMs));
   fake_clock_.AdvanceTimeMilliseconds(kFrameIntervalMs);
@@ -1995,8 +2004,9 @@ TEST_P(RtpSenderVideoTest, ConditionalRetransmitLimit) {
       (RTPSenderVideo::kTLRateWindowSizeMs + (kFrameIntervalMs / 2)) /
       kFrameIntervalMs;
   constexpr int kPattern[] = {0, 2, 2, 2};
+  auto& vp8_header = header.video_type_header.emplace<RTPVideoHeaderVP8>();
   for (size_t i = 0; i < arraysize(kPattern) * kNumRepetitions; ++i) {
-    header.vp8().temporalIdx = kPattern[i % arraysize(kPattern)];
+    vp8_header.temporalIdx = kPattern[i % arraysize(kPattern)];
 
     rtp_sender_video_->GetStorageType(header, kSettings, kRttMs);
     fake_clock_.AdvanceTimeMilliseconds(kFrameIntervalMs);
@@ -2007,9 +2017,39 @@ TEST_P(RtpSenderVideoTest, ConditionalRetransmitLimit) {
   // we don't store for retransmission because we expect a frame in a lower
   // layer, but that last frame in TL1 was a long time ago in absolute terms,
   // so allow retransmission anyway.
-  header.vp8().temporalIdx = 1;
+  vp8_header.temporalIdx = 1;
   EXPECT_EQ(StorageType::kAllowRetransmission,
             rtp_sender_video_->GetStorageType(header, kSettings, kRttMs));
+}
+
+TEST_P(RtpSenderVideoTest, PopulateGenericFrameDescriptor) {
+  const int64_t kFrameId = 100000;
+  uint8_t kFrame[100];
+  EXPECT_EQ(0, rtp_sender_->RegisterRtpHeaderExtension(
+                   kRtpExtensionGenericFrameDescriptor, kGenericDescriptorId));
+
+  RTPVideoHeader hdr;
+  RTPVideoHeader::GenericDescriptorInfo& generic = hdr.generic.emplace();
+  generic.frame_id = kFrameId;
+  generic.temporal_index = 3;
+  generic.spatial_index = 2;
+  generic.higher_spatial_layers.push_back(4);
+  generic.dependencies.push_back(kFrameId - 1);
+  generic.dependencies.push_back(kFrameId - 500);
+  rtp_sender_video_->SendVideo(kVideoCodecGeneric, kVideoFrameDelta, kPayload,
+                               kTimestamp, 0, kFrame, sizeof(kFrame), nullptr,
+                               &hdr, kDefaultExpectedRetransmissionTimeMs);
+
+  RtpGenericFrameDescriptor descriptor_wire;
+  EXPECT_EQ(1U, transport_.sent_packets_.size());
+  EXPECT_TRUE(
+      transport_.last_sent_packet()
+          .GetExtension<RtpGenericFrameDescriptorExtension>(&descriptor_wire));
+  EXPECT_EQ(static_cast<uint16_t>(generic.frame_id), descriptor_wire.FrameId());
+  EXPECT_EQ(generic.temporal_index, descriptor_wire.TemporalLayer());
+  EXPECT_THAT(descriptor_wire.FrameDependenciesDiffs(), ElementsAre(1, 500));
+  uint8_t spatial_bitmask = 0x14;
+  EXPECT_EQ(spatial_bitmask, descriptor_wire.SpatialLayersBitmask());
 }
 
 TEST_P(RtpSenderTest, OnOverheadChanged) {

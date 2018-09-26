@@ -59,14 +59,8 @@ struct RtcpStatistics {
         jitter(0) {}
 
   uint8_t fraction_lost;
-  union {
-    int32_t packets_lost;  // Defined as a 24 bit signed integer in RTCP
-    RTC_DEPRECATED uint32_t cumulative_lost;
-  };
-  union {
-    uint32_t extended_highest_sequence_number;
-    RTC_DEPRECATED uint32_t extended_max_sequence_number;
-  };
+  int32_t packets_lost;  // Defined as a 24 bit signed integer in RTCP
+  uint32_t extended_highest_sequence_number;
   uint32_t jitter;
 };
 
@@ -339,26 +333,14 @@ enum Profile {
 // Video codec types
 enum VideoCodecType {
   // There are various memset(..., 0, ...) calls in the code that rely on
-  // kVideoCodecUnknown being zero.
-  kVideoCodecUnknown = 0,
+  // kVideoCodecGeneric being zero.
+  kVideoCodecGeneric = 0,
   kVideoCodecVP8,
   kVideoCodecVP9,
   kVideoCodecH264,
   kVideoCodecI420,
-  kVideoCodecGeneric,
   kVideoCodecMultiplex,
-
-  // TODO(nisse): Deprecated aliases, for code expecting RtpVideoCodecTypes.
-  kRtpVideoNone = kVideoCodecUnknown,
-  kRtpVideoGeneric = kVideoCodecGeneric,
-  kRtpVideoVp8 = kVideoCodecVP8,
-  kRtpVideoVp9 = kVideoCodecVP9,
-  kRtpVideoH264 = kVideoCodecH264,
 };
-
-// Translates from name of codec to codec type and vice versa.
-const char* CodecTypeToPayloadString(VideoCodecType type);
-VideoCodecType PayloadStringToCodecType(const std::string& name);
 
 struct SpatialLayer {
   bool operator==(const SpatialLayer& other) const;
@@ -366,6 +348,7 @@ struct SpatialLayer {
 
   unsigned short width;
   unsigned short height;
+  float maxFramerate;  // fps.
   unsigned char numberOfTemporalLayers;
   unsigned int maxBitrate;     // kilobits/sec.
   unsigned int targetBitrate;  // kilobits/sec.
@@ -407,24 +390,6 @@ struct OverUseDetectorOptions {
   double initial_process_noise[2];
   double initial_avg_noise;
   double initial_var_noise;
-};
-
-// TODO(nisse): This struct is phased out, delete as soon as down stream code is
-// updated.
-
-// This structure will have the information about when packet is actually
-// received by socket.
-struct PacketTime {
-  PacketTime() : timestamp(-1), not_before(-1) {}
-  PacketTime(int64_t timestamp, int64_t not_before)
-      : timestamp(timestamp), not_before(not_before) {}
-
-  int64_t timestamp;   // Receive time after socket delivers the data.
-  int64_t not_before;  // Earliest possible time the data could have arrived,
-                       // indicating the potential error in the |timestamp|
-                       // value,in case the system is busy.
-                       // For example, the time of the last select() call.
-                       // If unknown, this value will be set to zero.
 };
 
 // Minimum and maximum playout delay values from capture to render.

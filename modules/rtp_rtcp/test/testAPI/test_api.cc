@@ -13,7 +13,6 @@
 #include <algorithm>
 #include <memory>
 #include <string>
-#include <vector>
 
 #include "rtc_base/checks.h"
 #include "rtc_base/rate_limiter.h"
@@ -57,7 +56,7 @@ bool LoopBackTransport::SendRtp(const uint8_t* data,
   const uint8_t* payload = data + header.headerLength;
   RTC_CHECK_GE(len, header.headerLength);
   const size_t payload_length = len - header.headerLength;
-  receive_statistics_->IncomingPacket(header, len, false);
+  receive_statistics_->IncomingPacket(header, len);
   return rtp_receiver_->IncomingRtpPacket(header, payload, payload_length,
                                           pl->typeSpecific);
 }
@@ -82,44 +81,34 @@ class RtpRtcpAPITest : public ::testing::Test {
  protected:
   RtpRtcpAPITest()
       : fake_clock_(123456), retransmission_rate_limiter_(&fake_clock_, 1000) {
-    test_csrcs_.push_back(1234);
-    test_csrcs_.push_back(2345);
-    test_ssrc_ = 3456;
-    test_timestamp_ = 4567;
-    test_sequence_number_ = 2345;
   }
   ~RtpRtcpAPITest() override = default;
 
-  const uint32_t initial_ssrc = 8888;
-
   void SetUp() override {
+    const uint32_t kInitialSsrc = 8888;
     RtpRtcp::Configuration configuration;
     configuration.audio = true;
     configuration.clock = &fake_clock_;
     configuration.outgoing_transport = &null_transport_;
     configuration.retransmission_rate_limiter = &retransmission_rate_limiter_;
     module_.reset(RtpRtcp::CreateRtpRtcp(configuration));
-    module_->SetSSRC(initial_ssrc);
-    rtp_payload_registry_.reset(new RTPPayloadRegistry());
+    module_->SetSSRC(kInitialSsrc);
   }
 
-  std::unique_ptr<RTPPayloadRegistry> rtp_payload_registry_;
-  std::unique_ptr<RtpRtcp> module_;
-  uint32_t test_ssrc_;
-  uint32_t test_timestamp_;
-  uint16_t test_sequence_number_;
-  std::vector<uint32_t> test_csrcs_;
   SimulatedClock fake_clock_;
   test::NullTransport null_transport_;
   RateLimiter retransmission_rate_limiter_;
+  std::unique_ptr<RtpRtcp> module_;
 };
 
 TEST_F(RtpRtcpAPITest, Basic) {
-  module_->SetSequenceNumber(test_sequence_number_);
-  EXPECT_EQ(test_sequence_number_, module_->SequenceNumber());
+  const uint16_t kSequenceNumber = 2345;
+  module_->SetSequenceNumber(kSequenceNumber);
+  EXPECT_EQ(kSequenceNumber, module_->SequenceNumber());
 
-  module_->SetStartTimestamp(test_timestamp_);
-  EXPECT_EQ(test_timestamp_, module_->StartTimestamp());
+  const uint32_t kTimestamp = 4567;
+  module_->SetStartTimestamp(kTimestamp);
+  EXPECT_EQ(kTimestamp, module_->StartTimestamp());
 
   EXPECT_FALSE(module_->Sending());
   EXPECT_EQ(0, module_->SetSendingStatus(true));
@@ -132,8 +121,9 @@ TEST_F(RtpRtcpAPITest, PacketSize) {
 }
 
 TEST_F(RtpRtcpAPITest, SSRC) {
-  module_->SetSSRC(test_ssrc_);
-  EXPECT_EQ(test_ssrc_, module_->SSRC());
+  const uint32_t kSsrc = 3456;
+  module_->SetSSRC(kSsrc);
+  EXPECT_EQ(kSsrc, module_->SSRC());
 }
 
 TEST_F(RtpRtcpAPITest, RTCP) {

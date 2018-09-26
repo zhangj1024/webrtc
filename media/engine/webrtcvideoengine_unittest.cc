@@ -40,6 +40,7 @@
 #include "media/engine/webrtcvoiceengine.h"
 #include "modules/rtp_rtcp/include/rtp_header_parser.h"
 #include "rtc_base/arraysize.h"
+#include "rtc_base/fakeclock.h"
 #include "rtc_base/gunit.h"
 #include "rtc_base/numerics/safe_conversions.h"
 #include "rtc_base/stringutils.h"
@@ -210,7 +211,11 @@ class WebRtcVideoEngineTest : public ::testing::Test {
         engine_(std::unique_ptr<cricket::FakeWebRtcVideoEncoderFactory>(
                     encoder_factory_),
                 std::unique_ptr<cricket::FakeWebRtcVideoDecoderFactory>(
-                    decoder_factory_)) {}
+                    decoder_factory_)) {
+    // Ensure fake clock doesn't return 0, which will cause some initializations
+    // fail inside RTP senders.
+    fake_clock_.AdvanceTimeMicros(1);
+  }
 
  protected:
   void AssignDefaultAptRtxTypes();
@@ -231,6 +236,9 @@ class WebRtcVideoEngineTest : public ::testing::Test {
 
   void TestExtendedEncoderOveruse(bool use_external_encoder);
 
+  // Has to be the first one, so it is initialized before the call or there is a
+  // race condition in the clock access.
+  rtc::ScopedFakeClock fake_clock_;
   webrtc::test::ScopedFieldTrials override_field_trials_;
   webrtc::RtcEventLogNullImpl event_log_;
   // Used in WebRtcVideoEngineVoiceTest, but defined here so it's properly
@@ -1434,6 +1442,59 @@ TEST_F(WebRtcVideoChannelBaseTest, SetSendSetsTransportBufferSizes) {
   EXPECT_TRUE(SetSend(true));
   EXPECT_EQ(64 * 1024, network_interface_.sendbuf_size());
   EXPECT_EQ(64 * 1024, network_interface_.recvbuf_size());
+}
+
+// Test that we properly set the send and recv buffer sizes when overriding
+// via field trials.
+TEST_F(WebRtcVideoChannelBaseTest, OverridesRecvBufferSize) {
+  // Set field trial to override the default recv buffer size, and then re-run
+  // setup where the interface is created and configured.
+  const int kCustomRecvBufferSize = 123456;
+  webrtc::test::ScopedFieldTrials field_trial(
+      "WebRTC-IncreasedReceivebuffers/123456/");
+  SetUp();
+
+  EXPECT_TRUE(SetOneCodec(DefaultCodec()));
+  EXPECT_TRUE(SetSend(true));
+  EXPECT_EQ(64 * 1024, network_interface_.sendbuf_size());
+  EXPECT_EQ(kCustomRecvBufferSize, network_interface_.recvbuf_size());
+}
+
+// Test that we properly set the send and recv buffer sizes when overriding
+// via field trials with suffix.
+TEST_F(WebRtcVideoChannelBaseTest, OverridesRecvBufferSizeWithSuffix) {
+  // Set field trial to override the default recv buffer size, and then re-run
+  // setup where the interface is created and configured.
+  const int kCustomRecvBufferSize = 123456;
+  webrtc::test::ScopedFieldTrials field_trial(
+      "WebRTC-IncreasedReceivebuffers/123456_Dogfood/");
+  SetUp();
+
+  EXPECT_TRUE(SetOneCodec(DefaultCodec()));
+  EXPECT_TRUE(SetSend(true));
+  EXPECT_EQ(64 * 1024, network_interface_.sendbuf_size());
+  EXPECT_EQ(kCustomRecvBufferSize, network_interface_.recvbuf_size());
+}
+
+// Test that we properly set the send and recv buffer sizes when overriding
+// via field trials that don't make any sense.
+TEST_F(WebRtcVideoChannelBaseTest, InvalidRecvBufferSize) {
+  // Set bogus field trial values to override the default recv buffer size, and
+  // then re-run setup where the interface is created and configured. The
+  // default value should still be used.
+
+  for (std::string group : {" ", "NotANumber", "-1", "0"}) {
+    std::string field_trial_string = "WebRTC-IncreasedReceivebuffers/";
+    field_trial_string += group;
+    field_trial_string += "/";
+    webrtc::test::ScopedFieldTrials field_trial(field_trial_string);
+    SetUp();
+
+    EXPECT_TRUE(SetOneCodec(DefaultCodec()));
+    EXPECT_TRUE(SetSend(true));
+    EXPECT_EQ(64 * 1024, network_interface_.sendbuf_size());
+    EXPECT_EQ(64 * 1024, network_interface_.recvbuf_size());
+  }
 }
 
 // Test that stats work properly for a 1-1 call.
@@ -3427,6 +3488,7 @@ TEST_F(WebRtcVideoChannelTest, EstimatesNtpStartTimeCorrectly) {
   // This timestamp is kInitialTimestamp (-1) + kFrameOffsetMs * 90, which
   // triggers a constant-overflow warning, hence we're calculating it explicitly
   // here.
+  fake_clock_.AdvanceTimeMicros(kFrameOffsetMs * rtc::kNumMicrosecsPerMillisec);
   video_frame.set_timestamp(kFrameOffsetMs * 90 - 1);
   video_frame.set_ntp_time_ms(kInitialNtpTimeMs + kFrameOffsetMs);
   stream->InjectFrame(video_frame);
@@ -4277,7 +4339,7 @@ TEST_F(WebRtcVideoChannelTest, SetRecvCodecsAcceptDefaultCodecs) {
 
   FakeVideoReceiveStream* stream = AddRecvStream();
   const webrtc::VideoReceiveStream::Config& config = stream->GetConfig();
-  EXPECT_EQ(engine_.codecs()[0].name, config.decoders[0].payload_name);
+  EXPECT_EQ(engine_.codecs()[0].name, config.decoders[0].video_format.name);
   EXPECT_EQ(engine_.codecs()[0].id, config.decoders[0].payload_type);
 }
 
@@ -5349,6 +5411,32 @@ TEST_F(WebRtcVideoChannelTest,
             stream->GetVideoStreams()[0].max_bitrate_bps);
 }
 
+TEST_F(WebRtcVideoChannelTest, SetMaxFramerateOneStream) {
+  FakeVideoSendStream* stream = AddSendStream();
+
+  webrtc::RtpParameters parameters = channel_->GetRtpSendParameters(last_ssrc_);
+  EXPECT_EQ(1UL, parameters.encodings.size());
+  EXPECT_FALSE(parameters.encodings[0].max_framerate.has_value());
+  EXPECT_TRUE(channel_->SetRtpSendParameters(last_ssrc_, parameters).ok());
+
+  // Note that this is testing the behavior of the FakeVideoSendStream, which
+  // also calls to CreateEncoderStreams to get the VideoStreams, so essentially
+  // we are just testing the behavior of
+  // EncoderStreamFactory::CreateEncoderStreams.
+  ASSERT_EQ(1UL, stream->GetVideoStreams().size());
+  EXPECT_EQ(kDefaultVideoMaxFramerate,
+            stream->GetVideoStreams()[0].max_framerate);
+
+  // Set max framerate and check that VideoStream.max_framerate is set.
+  const int kNewMaxFramerate = kDefaultVideoMaxFramerate - 1;
+  parameters = channel_->GetRtpSendParameters(last_ssrc_);
+  parameters.encodings[0].max_framerate = kNewMaxFramerate;
+  EXPECT_TRUE(channel_->SetRtpSendParameters(last_ssrc_, parameters).ok());
+
+  ASSERT_EQ(1UL, stream->GetVideoStreams().size());
+  EXPECT_EQ(kNewMaxFramerate, stream->GetVideoStreams()[0].max_framerate);
+}
+
 TEST_F(WebRtcVideoChannelTest,
        CannotSetRtpSendParametersWithIncorrectNumberOfEncodings) {
   AddSendStream();
@@ -5499,6 +5587,120 @@ TEST_F(WebRtcVideoChannelTest, SetRtpSendParametersPrioritySimulcastStreams) {
   EXPECT_EQ(absl::nullopt,
             video_send_stream->GetVideoStreams()[2].bitrate_priority);
   EXPECT_TRUE(channel_->SetVideoSend(primary_ssrc, nullptr, nullptr));
+}
+
+TEST_F(WebRtcVideoChannelTest, GetAndSetRtpSendParametersMaxFramerate) {
+  const size_t kNumSimulcastStreams = 3;
+  SetUpSimulcast(true, false);
+
+  // Get and set the rtp encoding parameters.
+  webrtc::RtpParameters parameters = channel_->GetRtpSendParameters(last_ssrc_);
+  EXPECT_EQ(kNumSimulcastStreams, parameters.encodings.size());
+  for (const auto& encoding : parameters.encodings) {
+    EXPECT_FALSE(encoding.max_framerate);
+  }
+
+  // Change the value and set it on the VideoChannel.
+  parameters.encodings[0].max_framerate = 10;
+  parameters.encodings[1].max_framerate = 20;
+  parameters.encodings[2].max_framerate = 25;
+  EXPECT_TRUE(channel_->SetRtpSendParameters(last_ssrc_, parameters).ok());
+
+  // Verify that the bitrates are set on the VideoChannel.
+  parameters = channel_->GetRtpSendParameters(last_ssrc_);
+  EXPECT_EQ(kNumSimulcastStreams, parameters.encodings.size());
+  EXPECT_EQ(10, parameters.encodings[0].max_framerate);
+  EXPECT_EQ(20, parameters.encodings[1].max_framerate);
+  EXPECT_EQ(25, parameters.encodings[2].max_framerate);
+}
+
+TEST_F(WebRtcVideoChannelTest, MaxSimulcastFrameratePropagatedToEncoder) {
+  const size_t kNumSimulcastStreams = 3;
+  FakeVideoSendStream* stream = SetUpSimulcast(true, false);
+
+  // Send a full size frame so all simulcast layers are used when reconfiguring.
+  FakeVideoCapturerWithTaskQueue capturer;
+  VideoOptions options;
+  EXPECT_TRUE(channel_->SetVideoSend(last_ssrc_, &options, &capturer));
+  EXPECT_EQ(cricket::CS_RUNNING,
+            capturer.Start(capturer.GetSupportedFormats()->front()));
+  channel_->SetSend(true);
+  EXPECT_TRUE(capturer.CaptureFrame());
+
+  // Get and set the rtp encoding parameters.
+  // Change the value and set it on the VideoChannel.
+  webrtc::RtpParameters parameters = channel_->GetRtpSendParameters(last_ssrc_);
+  EXPECT_EQ(kNumSimulcastStreams, parameters.encodings.size());
+  parameters.encodings[0].max_framerate = 15;
+  parameters.encodings[1].max_framerate = 25;
+  parameters.encodings[2].max_framerate = 20;
+  EXPECT_TRUE(channel_->SetRtpSendParameters(last_ssrc_, parameters).ok());
+
+  // Verify that the new value propagated down to the encoder.
+  // Check that WebRtcVideoSendStream updates VideoEncoderConfig correctly.
+  EXPECT_EQ(2, stream->num_encoder_reconfigurations());
+  webrtc::VideoEncoderConfig encoder_config = stream->GetEncoderConfig().Copy();
+  EXPECT_EQ(kNumSimulcastStreams, encoder_config.number_of_streams);
+  EXPECT_EQ(kNumSimulcastStreams, encoder_config.simulcast_layers.size());
+  EXPECT_EQ(15, encoder_config.simulcast_layers[0].max_framerate);
+  EXPECT_EQ(25, encoder_config.simulcast_layers[1].max_framerate);
+  EXPECT_EQ(20, encoder_config.simulcast_layers[2].max_framerate);
+
+  // FakeVideoSendStream calls CreateEncoderStreams, test that the vector of
+  // VideoStreams are created appropriately for the simulcast case.
+  // Currently the maximum |max_framerate| is used.
+  EXPECT_EQ(kNumSimulcastStreams, stream->GetVideoStreams().size());
+  EXPECT_EQ(25, stream->GetVideoStreams()[0].max_framerate);
+  EXPECT_EQ(25, stream->GetVideoStreams()[1].max_framerate);
+  EXPECT_EQ(25, stream->GetVideoStreams()[2].max_framerate);
+
+  EXPECT_TRUE(channel_->SetVideoSend(last_ssrc_, nullptr, nullptr));
+}
+
+TEST_F(WebRtcVideoChannelTest,
+       DefaultValuePropagatedToEncoderForUnsetFramerate) {
+  const size_t kNumSimulcastStreams = 3;
+  const std::vector<webrtc::VideoStream> kDefault = GetSimulcastBitrates720p();
+  FakeVideoSendStream* stream = SetUpSimulcast(true, false);
+
+  // Send a full size frame so all simulcast layers are used when reconfiguring.
+  FakeVideoCapturerWithTaskQueue capturer;
+  VideoOptions options;
+  EXPECT_TRUE(channel_->SetVideoSend(last_ssrc_, &options, &capturer));
+  EXPECT_EQ(cricket::CS_RUNNING,
+            capturer.Start(capturer.GetSupportedFormats()->front()));
+  channel_->SetSend(true);
+  EXPECT_TRUE(capturer.CaptureFrame());
+
+  // Get and set the rtp encoding parameters.
+  // Change the value and set it on the VideoChannel.
+  webrtc::RtpParameters parameters = channel_->GetRtpSendParameters(last_ssrc_);
+  EXPECT_EQ(kNumSimulcastStreams, parameters.encodings.size());
+  parameters.encodings[0].max_framerate = 15;
+  parameters.encodings[2].max_framerate = 20;
+  EXPECT_TRUE(channel_->SetRtpSendParameters(last_ssrc_, parameters).ok());
+
+  // Verify that the new value propagated down to the encoder.
+  // Check that WebRtcVideoSendStream updates VideoEncoderConfig correctly.
+  webrtc::VideoEncoderConfig encoder_config = stream->GetEncoderConfig().Copy();
+  EXPECT_EQ(kNumSimulcastStreams, encoder_config.number_of_streams);
+  EXPECT_EQ(kNumSimulcastStreams, encoder_config.simulcast_layers.size());
+  EXPECT_EQ(15, encoder_config.simulcast_layers[0].max_framerate);
+  EXPECT_EQ(-1, encoder_config.simulcast_layers[1].max_framerate);
+  EXPECT_EQ(20, encoder_config.simulcast_layers[2].max_framerate);
+
+  // FakeVideoSendStream calls CreateEncoderStreams, test that the vector of
+  // VideoStreams are created appropriately for the simulcast case.
+  // The maximum |max_framerate| is used, kDefaultVideoMaxFramerate: 60.
+  EXPECT_EQ(kNumSimulcastStreams, stream->GetVideoStreams().size());
+  EXPECT_EQ(kDefaultVideoMaxFramerate,
+            stream->GetVideoStreams()[0].max_framerate);
+  EXPECT_EQ(kDefaultVideoMaxFramerate,
+            stream->GetVideoStreams()[1].max_framerate);
+  EXPECT_EQ(kDefaultVideoMaxFramerate,
+            stream->GetVideoStreams()[2].max_framerate);
+
+  EXPECT_TRUE(channel_->SetVideoSend(last_ssrc_, nullptr, nullptr));
 }
 
 TEST_F(WebRtcVideoChannelTest, GetAndSetRtpSendParametersMinAndMaxBitrate) {
@@ -6145,17 +6347,17 @@ TEST_F(WebRtcVideoChannelTest, DISABLED_GetRtpReceiveFmtpSprop) {
   EXPECT_EQ(kH264sprop1.ToCodecParameters(), rtp_parameters.codecs[0]);
   ASSERT_EQ(2u, cfg.decoders.size());
   EXPECT_EQ(101, cfg.decoders[0].payload_type);
-  EXPECT_EQ("H264", cfg.decoders[0].payload_name);
+  EXPECT_EQ("H264", cfg.decoders[0].video_format.name);
   const auto it0 =
-      cfg.decoders[0].codec_params.find(kH264FmtpSpropParameterSets);
-  ASSERT_TRUE(it0 != cfg.decoders[0].codec_params.end());
+      cfg.decoders[0].video_format.parameters.find(kH264FmtpSpropParameterSets);
+  ASSERT_TRUE(it0 != cfg.decoders[0].video_format.parameters.end());
   EXPECT_EQ("uvw", it0->second);
 
   EXPECT_EQ(102, cfg.decoders[1].payload_type);
-  EXPECT_EQ("H264", cfg.decoders[1].payload_name);
+  EXPECT_EQ("H264", cfg.decoders[1].video_format.name);
   const auto it1 =
-      cfg.decoders[1].codec_params.find(kH264FmtpSpropParameterSets);
-  ASSERT_TRUE(it1 != cfg.decoders[1].codec_params.end());
+      cfg.decoders[1].video_format.parameters.find(kH264FmtpSpropParameterSets);
+  ASSERT_TRUE(it1 != cfg.decoders[1].video_format.parameters.end());
   EXPECT_EQ("xyz", it1->second);
 }
 
@@ -6468,13 +6670,28 @@ TEST_F(WebRtcVideoChannelSimulcastTest, SetSendCodecsWithOddSizeInSimulcast) {
                           true);
 }
 
+TEST_F(WebRtcVideoChannelSimulcastTest, SetSendCodecsForScreenshare) {
+  VerifySimulcastSettings(cricket::VideoCodec("VP8"), 1280, 720, 3, 1, true,
+                          false);
+}
+
+TEST_F(WebRtcVideoChannelSimulcastTest,
+       SetSendCodecsForConferenceModeScreenshare) {
+  VerifySimulcastSettings(cricket::VideoCodec("VP8"), 1280, 720, 3, 1, true,
+                          true);
+}
+
 TEST_F(WebRtcVideoChannelSimulcastTest, SetSendCodecsForSimulcastScreenshare) {
+  webrtc::test::ScopedFieldTrials override_field_trials_(
+      "WebRTC-SimulcastScreenshare/Enabled/");
   VerifySimulcastSettings(cricket::VideoCodec("VP8"), 1280, 720, 3, 2, true,
                           true);
 }
 
 TEST_F(WebRtcVideoChannelSimulcastTest,
        NoSimulcastScreenshareWithoutConference) {
+  webrtc::test::ScopedFieldTrials override_field_trials_(
+      "WebRTC-SimulcastScreenshare/Enabled/");
   VerifySimulcastSettings(cricket::VideoCodec("VP8"), 1280, 720, 3, 1, true,
                           false);
 }

@@ -70,6 +70,7 @@ rtc_static_library("transport_feedback") {
   ]
 
   deps = [
+    "../../api/transport:network_control",
     "../../modules:module_api",
     "../../rtc_base:checks",
     "../../rtc_base:rtc_base_approved",
@@ -125,6 +126,7 @@ if (rtc_include_tests) {
       "bbr:bbr_unittests",
       "goog_cc:estimators",
       "goog_cc:goog_cc_unittests",
+      "pcc:pcc_unittests",
       "rtp:congestion_controller_unittests",
     ]
     if (!build_with_chromium && is_clang) {

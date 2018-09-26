@@ -26,8 +26,9 @@ VCMPacket::VCMPacket()
       markerBit(false),
       timesNacked(-1),
       frameType(kEmptyFrame),
-      codec(kVideoCodecUnknown),
+      codec(kVideoCodecGeneric),
       is_first_packet_in_frame(false),
+      is_last_packet_in_frame(false),
       completeNALU(kNaluUnset),
       insertStartCode(false),
       width(0),
@@ -52,6 +53,7 @@ VCMPacket::VCMPacket(const uint8_t* ptr,
       codec(rtpHeader.video_header().codec),
       is_first_packet_in_frame(
           rtpHeader.video_header().is_first_packet_in_frame),
+      is_last_packet_in_frame(rtpHeader.video_header().is_last_packet_in_frame),
       completeNALU(kNaluIncomplete),
       insertStartCode(rtpHeader.video_header().codec == kVideoCodecH264 &&
                       rtpHeader.video_header().is_first_packet_in_frame),

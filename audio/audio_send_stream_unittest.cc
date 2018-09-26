@@ -221,9 +221,6 @@ struct ConfigHelper {
       EXPECT_CALL(*channel_proxy_, RegisterTransport(_)).Times(1);
       EXPECT_CALL(*channel_proxy_, RegisterTransport(nullptr)).Times(1);
     }
-    EXPECT_CALL(*channel_proxy_, SetRtcEventLog(testing::NotNull())).Times(1);
-    EXPECT_CALL(*channel_proxy_, SetRtcEventLog(testing::IsNull()))
-        .Times(1);  // Destructor resets the event log
   }
 
   void SetupMockForSetupSendCodec(bool expect_set_encoder_call) {
@@ -382,8 +379,7 @@ TEST(AudioSendStreamTest, GetStats) {
   EXPECT_EQ(kSsrc, stats.local_ssrc);
   EXPECT_EQ(static_cast<int64_t>(kCallStats.bytesSent), stats.bytes_sent);
   EXPECT_EQ(kCallStats.packetsSent, stats.packets_sent);
-  EXPECT_EQ(static_cast<int32_t>(kReportBlock.cumulative_num_packets_lost),
-            stats.packets_lost);
+  EXPECT_EQ(kReportBlock.cumulative_num_packets_lost, stats.packets_lost);
   EXPECT_EQ(Q8ToFloat(kReportBlock.fraction_lost), stats.fraction_lost);
   EXPECT_EQ(std::string(kIsacCodec.plname), stats.codec_name);
   EXPECT_EQ(static_cast<int32_t>(kReportBlock.extended_highest_sequence_number),

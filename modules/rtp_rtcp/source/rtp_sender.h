@@ -20,6 +20,7 @@
 #include "absl/types/optional.h"
 #include "api/array_view.h"
 #include "api/call/transport.h"
+#include "api/video/video_content_type.h"
 #include "common_types.h"  // NOLINT(build/include)
 #include "modules/rtp_rtcp/include/flexfec_sender.h"
 #include "modules/rtp_rtcp/include/rtp_header_extension_map.h"
@@ -115,6 +116,7 @@ class RTPSender {
 
   // RTP header extension
   int32_t RegisterRtpHeaderExtension(RTPExtensionType type, uint8_t id);
+  bool RegisterRtpHeaderExtension(const std::string& uri, int id);
   bool IsRtpHeaderExtensionRegistered(RTPExtensionType type) const;
   int32_t DeregisterRtpHeaderExtension(RTPExtensionType type);
 
@@ -337,6 +339,11 @@ class RTPSender {
   const bool populate_network2_timestamp_;
 
   const bool send_side_bwe_with_overhead_;
+
+  const bool unlimited_retransmission_experiment_;
+
+  absl::optional<VideoContentType> video_content_type_
+      RTC_GUARDED_BY(send_critsect_);
 
   RTC_DISALLOW_IMPLICIT_CONSTRUCTORS(RTPSender);
 };

@@ -45,8 +45,6 @@ void CopyFromConfigToEvent(const webrtc::InternalAPMConfig& config,
 
   pb_cfg->set_transient_suppression_enabled(
       config.transient_suppression_enabled);
-  pb_cfg->set_intelligibility_enhancer_enabled(
-      config.intelligibility_enhancer_enabled);
 
   pb_cfg->set_pre_amplifier_enabled(config.pre_amplifier_enabled);
   pb_cfg->set_pre_amplifier_fixed_gain_factor(
@@ -74,7 +72,8 @@ AecDumpImpl::~AecDumpImpl() {
   thread_sync_event.Wait(rtc::Event::kForever);
 }
 
-void AecDumpImpl::WriteInitMessage(const ProcessingConfig& api_format) {
+void AecDumpImpl::WriteInitMessage(const ProcessingConfig& api_format,
+                                   int64_t time_now_ms) {
   auto task = CreateWriteToFileTask();
   auto* event = task->GetEvent();
   event->set_type(audioproc::Event::INIT);
@@ -95,6 +94,7 @@ void AecDumpImpl::WriteInitMessage(const ProcessingConfig& api_format) {
       static_cast<int32_t>(api_format.reverse_input_stream().num_channels()));
   msg->set_num_reverse_output_channels(
       api_format.reverse_output_stream().num_channels());
+  msg->set_timestamp_ms(time_now_ms);
 
   worker_queue_->PostTask(std::unique_ptr<rtc::QueuedTask>(std::move(task)));
 }
@@ -164,6 +164,34 @@ void AecDumpImpl::WriteConfig(const InternalAPMConfig& config) {
   auto* event = task->GetEvent();
   event->set_type(audioproc::Event::CONFIG);
   CopyFromConfigToEvent(config, event->mutable_config());
+  worker_queue_->PostTask(std::unique_ptr<rtc::QueuedTask>(std::move(task)));
+}
+
+void AecDumpImpl::WriteRuntimeSetting(
+    const AudioProcessing::RuntimeSetting& runtime_setting) {
+  RTC_DCHECK_RUNS_SERIALIZED(&race_checker_);
+  auto task = CreateWriteToFileTask();
+  auto* event = task->GetEvent();
+  event->set_type(audioproc::Event::RUNTIME_SETTING);
+  audioproc::RuntimeSetting* setting = event->mutable_runtime_setting();
+  switch (runtime_setting.type()) {
+    case AudioProcessing::RuntimeSetting::Type::kCapturePreGain: {
+      float x;
+      runtime_setting.GetFloat(&x);
+      setting->set_capture_pre_gain(x);
+      break;
+    }
+    case AudioProcessing::RuntimeSetting::Type::
+        kCustomRenderProcessingRuntimeSetting: {
+      float x;
+      runtime_setting.GetFloat(&x);
+      setting->set_custom_render_processing_setting(x);
+      break;
+    }
+    case AudioProcessing::RuntimeSetting::Type::kNotSpecified:
+      RTC_NOTREACHED();
+      break;
+  }
   worker_queue_->PostTask(std::unique_ptr<rtc::QueuedTask>(std::move(task)));
 }
 

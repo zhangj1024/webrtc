@@ -210,31 +210,6 @@ IceCandidatePairEventType GetRuntimeIceCandidatePairEventType(
   return IceCandidatePairEventType::kCheckSent;
 }
 
-// Return default values for header extensions, to use on streams without stored
-// mapping data. Currently this only applies to audio streams, since the mapping
-// is not stored in the event log.
-// TODO(ivoc): Remove this once this mapping is stored in the event log for
-//             audio streams. Tracking bug: webrtc:6399
-webrtc::RtpHeaderExtensionMap GetDefaultHeaderExtensionMap() {
-  webrtc::RtpHeaderExtensionMap default_map;
-  default_map.Register<AudioLevel>(webrtc::RtpExtension::kAudioLevelDefaultId);
-  default_map.Register<TransmissionOffset>(
-      webrtc::RtpExtension::kTimestampOffsetDefaultId);
-  default_map.Register<AbsoluteSendTime>(
-      webrtc::RtpExtension::kAbsSendTimeDefaultId);
-  default_map.Register<VideoOrientation>(
-      webrtc::RtpExtension::kVideoRotationDefaultId);
-  default_map.Register<VideoContentTypeExtension>(
-      webrtc::RtpExtension::kVideoContentTypeDefaultId);
-  default_map.Register<VideoTimingExtension>(
-      webrtc::RtpExtension::kVideoTimingDefaultId);
-  default_map.Register<TransportSequenceNumber>(
-      webrtc::RtpExtension::kTransportSequenceNumberDefaultId);
-  default_map.Register<PlayoutDelayLimits>(
-      webrtc::RtpExtension::kPlayoutDelayDefaultId);
-  return default_map;
-}
-
 std::pair<uint64_t, bool> ParseVarInt(
     std::istream& stream) {  // no-presubmit-check TODO(webrtc:8982)
   uint64_t varint = 0;
@@ -271,6 +246,86 @@ void GetHeaderExtensions(std::vector<RtpExtension>* header_extensions,
 }
 
 }  // namespace
+
+LoggedRtcpPacket::LoggedRtcpPacket(uint64_t timestamp_us,
+                                   const uint8_t* packet,
+                                   size_t total_length)
+    : timestamp_us(timestamp_us), raw_data(packet, packet + total_length) {}
+LoggedRtcpPacket::LoggedRtcpPacket(const LoggedRtcpPacket& rhs) = default;
+LoggedRtcpPacket::~LoggedRtcpPacket() = default;
+
+LoggedVideoSendConfig::LoggedVideoSendConfig(
+    int64_t timestamp_us,
+    const std::vector<rtclog::StreamConfig>& configs)
+    : timestamp_us(timestamp_us), configs(configs) {}
+LoggedVideoSendConfig::LoggedVideoSendConfig(const LoggedVideoSendConfig& rhs) =
+    default;
+LoggedVideoSendConfig::~LoggedVideoSendConfig() = default;
+
+ParsedRtcEventLogNew::~ParsedRtcEventLogNew() = default;
+
+ParsedRtcEventLogNew::LoggedRtpStreamIncoming::LoggedRtpStreamIncoming() =
+    default;
+ParsedRtcEventLogNew::LoggedRtpStreamIncoming::LoggedRtpStreamIncoming(
+    const LoggedRtpStreamIncoming& rhs) = default;
+ParsedRtcEventLogNew::LoggedRtpStreamIncoming::~LoggedRtpStreamIncoming() =
+    default;
+
+ParsedRtcEventLogNew::LoggedRtpStreamOutgoing::LoggedRtpStreamOutgoing() =
+    default;
+ParsedRtcEventLogNew::LoggedRtpStreamOutgoing::LoggedRtpStreamOutgoing(
+    const LoggedRtpStreamOutgoing& rhs) = default;
+ParsedRtcEventLogNew::LoggedRtpStreamOutgoing::~LoggedRtpStreamOutgoing() =
+    default;
+
+ParsedRtcEventLogNew::LoggedRtpStreamView::LoggedRtpStreamView(
+    uint32_t ssrc,
+    const LoggedRtpPacketIncoming* ptr,
+    size_t num_elements)
+    : ssrc(ssrc),
+      packet_view(PacketView<const LoggedRtpPacket>::Create(
+          ptr,
+          num_elements,
+          offsetof(LoggedRtpPacketIncoming, rtp))) {}
+
+ParsedRtcEventLogNew::LoggedRtpStreamView::LoggedRtpStreamView(
+    uint32_t ssrc,
+    const LoggedRtpPacketOutgoing* ptr,
+    size_t num_elements)
+    : ssrc(ssrc),
+      packet_view(PacketView<const LoggedRtpPacket>::Create(
+          ptr,
+          num_elements,
+          offsetof(LoggedRtpPacketOutgoing, rtp))) {}
+
+ParsedRtcEventLogNew::LoggedRtpStreamView::LoggedRtpStreamView(
+    const LoggedRtpStreamView&) = default;
+
+// Return default values for header extensions, to use on streams without stored
+// mapping data. Currently this only applies to audio streams, since the mapping
+// is not stored in the event log.
+// TODO(ivoc): Remove this once this mapping is stored in the event log for
+//             audio streams. Tracking bug: webrtc:6399
+webrtc::RtpHeaderExtensionMap
+ParsedRtcEventLogNew::GetDefaultHeaderExtensionMap() {
+  webrtc::RtpHeaderExtensionMap default_map;
+  default_map.Register<AudioLevel>(webrtc::RtpExtension::kAudioLevelDefaultId);
+  default_map.Register<TransmissionOffset>(
+      webrtc::RtpExtension::kTimestampOffsetDefaultId);
+  default_map.Register<AbsoluteSendTime>(
+      webrtc::RtpExtension::kAbsSendTimeDefaultId);
+  default_map.Register<VideoOrientation>(
+      webrtc::RtpExtension::kVideoRotationDefaultId);
+  default_map.Register<VideoContentTypeExtension>(
+      webrtc::RtpExtension::kVideoContentTypeDefaultId);
+  default_map.Register<VideoTimingExtension>(
+      webrtc::RtpExtension::kVideoTimingDefaultId);
+  default_map.Register<TransportSequenceNumber>(
+      webrtc::RtpExtension::kTransportSequenceNumberDefaultId);
+  default_map.Register<PlayoutDelayLimits>(
+      webrtc::RtpExtension::kPlayoutDelayDefaultId);
+  return default_map;
+}
 
 ParsedRtcEventLogNew::ParsedRtcEventLogNew(
     UnconfiguredHeaderExtensions parse_unconfigured_header_extensions)
@@ -528,6 +583,7 @@ void ParsedRtcEventLogNew::StoreParsedEvent(const rtclog::Event& event) {
           event, &direction, header, &header_length, &total_length, nullptr);
       RtpUtility::RtpHeaderParser rtp_parser(header, header_length);
       RTPHeader parsed_header;
+
       if (extension_map != nullptr) {
         rtp_parser.Parse(&parsed_header, extension_map);
       } else {
@@ -539,6 +595,15 @@ void ParsedRtcEventLogNew::StoreParsedEvent(const rtclog::Event& event) {
         //             Tracking bug: webrtc:6399
         rtp_parser.Parse(&parsed_header, &default_extension_map_);
       }
+
+      // Since we give the parser only a header, there is no way for it to know
+      // the padding length. The best solution would be to log the padding
+      // length in RTC event log. In absence of it, we assume the RTP packet to
+      // contain only padding, if the padding bit is set.
+      // TODO(webrtc:9730): Use a generic way to obtain padding length.
+      if ((header[0] & 0x20) != 0)
+        parsed_header.paddingLength = total_length - header_length;
+
       RTC_CHECK(event.has_timestamp_us());
       uint64_t timestamp_us = event.timestamp_us();
       if (direction == kIncomingPacket) {

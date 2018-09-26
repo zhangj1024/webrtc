@@ -25,6 +25,7 @@ rtc_static_library("encoded_frame") {
     "../../rtc_base:checks",
     "../../rtc_base:rtc_base_approved",
     "../../rtc_base/experiments:alr_experiment",
+    "../../rtc_base/experiments:rtt_mult_experiment",
     "../../system_wrappers:field_trial_api",
     "../../system_wrappers:system_wrappers",
     "//third_party/abseil-cpp/absl/types:optional",
@@ -169,6 +170,7 @@ rtc_static_library("video_coding") {
     "../../rtc_base:rtc_task_queue",
     "../../rtc_base:sequenced_task_checker",
     "../../rtc_base/experiments:alr_experiment",
+    "../../rtc_base/experiments:rtt_mult_experiment",
     "../../rtc_base/system:fallthrough",
     "../../rtc_base/third_party/base64",
     "../../rtc_base/time:timestamp_extrapolator",
@@ -232,6 +234,8 @@ rtc_source_set("video_coding_utility") {
     "utility/default_video_bitrate_allocator.h",
     "utility/frame_dropper.cc",
     "utility/frame_dropper.h",
+    "utility/framerate_controller.cc",
+    "utility/framerate_controller.h",
     "utility/ivf_file_writer.cc",
     "utility/ivf_file_writer.h",
     "utility/moving_average.cc",
@@ -353,11 +357,13 @@ rtc_static_library("webrtc_i420") {
 
 rtc_static_library("webrtc_multiplex") {
   sources = [
+    "codecs/multiplex/augmented_video_frame_buffer.cc",
+    "codecs/multiplex/include/augmented_video_frame_buffer.h",
     "codecs/multiplex/include/multiplex_decoder_adapter.h",
-    "codecs/multiplex/include/multiplex_encoded_image_packer.h",
     "codecs/multiplex/include/multiplex_encoder_adapter.h",
     "codecs/multiplex/multiplex_decoder_adapter.cc",
     "codecs/multiplex/multiplex_encoded_image_packer.cc",
+    "codecs/multiplex/multiplex_encoded_image_packer.h",
     "codecs/multiplex/multiplex_encoder_adapter.cc",
   ]
 
@@ -530,7 +536,6 @@ if (rtc_include_tests) {
         "../../media:rtc_media_base",
         "../../modules:module_api",
         "../../rtc_base:rtc_base_approved",
-        "../../sdk:common_objc",
         "../../sdk:native_api",
         "../../sdk:peerconnectionfactory_base_objc",
         "../../sdk:videocodec_objc",
@@ -795,8 +800,8 @@ if (rtc_include_tests) {
       "timing_unittest.cc",
       "utility/default_video_bitrate_allocator_unittest.cc",
       "utility/frame_dropper_unittest.cc",
+      "utility/framerate_controller_unittest.cc",
       "utility/ivf_file_writer_unittest.cc",
-      "utility/mock/mock_frame_dropper.h",
       "utility/moving_average_unittest.cc",
       "utility/quality_scaler_unittest.cc",
       "utility/simulcast_rate_allocator_unittest.cc",

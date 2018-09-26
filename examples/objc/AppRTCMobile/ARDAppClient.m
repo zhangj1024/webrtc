@@ -10,22 +10,23 @@
 
 #import "ARDAppClient+Internal.h"
 
-#import "WebRTC/RTCAudioTrack.h"
-#import "WebRTC/RTCCameraVideoCapturer.h"
-#import "WebRTC/RTCConfiguration.h"
-#import "WebRTC/RTCFileLogger.h"
-#import "WebRTC/RTCFileVideoCapturer.h"
-#import "WebRTC/RTCIceServer.h"
-#import "WebRTC/RTCLogging.h"
-#import "WebRTC/RTCMediaConstraints.h"
-#import "WebRTC/RTCMediaStream.h"
-#import "WebRTC/RTCPeerConnectionFactory.h"
-#import "WebRTC/RTCRtpSender.h"
-#import "WebRTC/RTCRtpTransceiver.h"
-#import "WebRTC/RTCTracing.h"
-#import "WebRTC/RTCVideoCodecFactory.h"
-#import "WebRTC/RTCVideoSource.h"
-#import "WebRTC/RTCVideoTrack.h"
+#import <WebRTC/RTCAudioTrack.h>
+#import <WebRTC/RTCCameraVideoCapturer.h>
+#import <WebRTC/RTCConfiguration.h>
+#import <WebRTC/RTCDefaultVideoDecoderFactory.h>
+#import <WebRTC/RTCDefaultVideoEncoderFactory.h>
+#import <WebRTC/RTCFileLogger.h>
+#import <WebRTC/RTCFileVideoCapturer.h>
+#import <WebRTC/RTCIceServer.h>
+#import <WebRTC/RTCLogging.h>
+#import <WebRTC/RTCMediaConstraints.h>
+#import <WebRTC/RTCMediaStream.h>
+#import <WebRTC/RTCPeerConnectionFactory.h>
+#import <WebRTC/RTCRtpSender.h>
+#import <WebRTC/RTCRtpTransceiver.h>
+#import <WebRTC/RTCTracing.h>
+#import <WebRTC/RTCVideoSource.h>
+#import <WebRTC/RTCVideoTrack.h>
 
 #import "ARDAppEngineClient.h"
 #import "ARDExternalSampleCapturer.h"
@@ -533,8 +534,14 @@ static int const kKbpsMultiplier = 1000;
   // Create peer connection.
   RTCMediaConstraints *constraints = [self defaultPeerConnectionConstraints];
   RTCConfiguration *config = [[RTCConfiguration alloc] init];
+  RTCCertificate *pcert = [RTCCertificate generateCertificateWithParams:@{
+    @"expires" : @100000,
+    @"name" : @"RSASSA-PKCS1-v1_5"
+  }];
   config.iceServers = _iceServers;
   config.sdpSemantics = RTCSdpSemanticsUnifiedPlan;
+  config.certificate = pcert;
+
   _peerConnection = [_factory peerConnectionWithConfiguration:config
                                                   constraints:constraints
                                                      delegate:self];

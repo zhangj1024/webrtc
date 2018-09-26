@@ -24,7 +24,6 @@
 #include "common_video/h264/profile_level_id.h"
 #include "common_video/include/incoming_video_stream.h"
 #include "common_video/libyuv/include/webrtc_libyuv.h"
-#include "modules/rtp_rtcp/include/rtp_receiver.h"
 #include "modules/rtp_rtcp/include/rtp_rtcp.h"
 #include "modules/utility/include/process_thread.h"
 #include "modules/video_coding/frame_object.h"
@@ -49,7 +48,7 @@ VideoCodec CreateDecoderVideoCodec(const VideoReceiveStream::Decoder& decoder) {
   memset(&codec, 0, sizeof(codec));
 
   codec.plType = decoder.payload_type;
-  codec.codecType = PayloadStringToCodecType(decoder.payload_name);
+  codec.codecType = PayloadStringToCodecType(decoder.video_format.name);
 
   if (codec.codecType == kVideoCodecVP8) {
     *(codec.VP8()) = VideoEncoder::GetDefaultVp8Settings();
@@ -58,10 +57,11 @@ VideoCodec CreateDecoderVideoCodec(const VideoReceiveStream::Decoder& decoder) {
   } else if (codec.codecType == kVideoCodecH264) {
     *(codec.H264()) = VideoEncoder::GetDefaultH264Settings();
     codec.H264()->profile =
-        H264::ParseSdpProfileLevelId(decoder.codec_params)->profile;
+        H264::ParseSdpProfileLevelId(decoder.video_format.parameters)->profile;
   } else if (codec.codecType == kVideoCodecMultiplex) {
     VideoReceiveStream::Decoder associated_decoder = decoder;
-    associated_decoder.payload_name = CodecTypeToPayloadString(kVideoCodecVP9);
+    associated_decoder.video_format =
+        SdpVideoFormat(CodecTypeToPayloadString(kVideoCodecVP9));
     VideoCodec associated_codec = CreateDecoderVideoCodec(associated_decoder);
     associated_codec.codecType = kVideoCodecMultiplex;
     return associated_codec;
@@ -146,6 +146,9 @@ VideoReceiveStream::VideoReceiveStream(
         config_.rtp.remote_ssrc, rtp_receive_statistics_.get());
     rtx_receiver_ = receiver_controller->CreateReceiver(
         config_.rtp.rtx_ssrc, rtx_receive_stream_.get());
+  } else {
+    rtp_receive_statistics_->EnableRetransmitDetection(config.rtp.remote_ssrc,
+                                                       true);
   }
 }
 
@@ -203,8 +206,8 @@ void VideoReceiveStream::Start() {
     video_receiver_.RegisterExternalDecoder(decoder.decoder,
                                             decoder.payload_type);
     VideoCodec codec = CreateDecoderVideoCodec(decoder);
-    RTC_CHECK(rtp_video_stream_receiver_.AddReceiveCodec(codec,
-                                                         decoder.codec_params));
+    rtp_video_stream_receiver_.AddReceiveCodec(codec,
+                                               decoder.video_format.parameters);
     RTC_CHECK_EQ(VCM_OK, video_receiver_.RegisterReceiveCodec(
                              &codec, num_cpu_cores_, false));
   }
@@ -320,10 +323,6 @@ EncodedImageCallback::Result VideoReceiveStream::OnEncodedImage(
     const CodecSpecificInfo* codec_specific_info,
     const RTPFragmentationHeader* fragmentation) {
   stats_proxy_.OnPreDecode(encoded_image, codec_specific_info);
-  size_t simulcast_idx = 0;
-  if (codec_specific_info->codecType == kVideoCodecVP8) {
-    simulcast_idx = codec_specific_info->codecSpecific.VP8.simulcastIdx;
-  }
   {
     rtc::CritScope lock(&ivf_writer_lock_);
     if (ivf_writer_.get()) {
@@ -334,7 +333,7 @@ EncodedImageCallback::Result VideoReceiveStream::OnEncodedImage(
     }
   }
 
-  return Result(Result::OK, encoded_image._timeStamp);
+  return Result(Result::OK, encoded_image.Timestamp());
 }
 
 void VideoReceiveStream::SendNack(

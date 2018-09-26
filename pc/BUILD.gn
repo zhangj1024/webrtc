@@ -214,6 +214,23 @@ rtc_static_library("peerconnection") {
   ]
 }
 
+rtc_static_library("builtin_video_bitrate_allocator_factory") {
+  sources = [
+    "builtin_video_bitrate_allocator_factory.cc",
+    "builtin_video_bitrate_allocator_factory.h",
+  ]
+
+  deps = [
+    "../api/video:video_bitrate_allocator_factory",
+    "../media:rtc_media_base",
+    "../modules/video_coding:video_coding_utility",
+    "../modules/video_coding:webrtc_vp9_helpers",
+    "../rtc_base:ptr_util",
+    "../rtc_base/system:fallthrough",
+    "//third_party/abseil-cpp/absl/memory",
+  ]
+}
+
 # This target implements CreatePeerConnectionFactory methods that will create a
 # PeerConnection will full functionality (audio, video and data). Applications
 # that wish to reduce their binary size by ommitting functionality they don't
@@ -338,7 +355,6 @@ if (rtc_include_tests) {
     deps = [
       ":pc_test_utils",
       "../api:libjingle_peerconnection_api",
-      "../api:libjingle_peerconnection_test_api",
       "../api:rtc_stats_api",
       "../api/audio_codecs:builtin_audio_decoder_factory",
       "../api/audio_codecs:builtin_audio_encoder_factory",
@@ -377,7 +393,6 @@ if (rtc_include_tests) {
       "test/fakevideotracksource.h",
       "test/framegeneratorcapturervideotracksource.h",
       "test/mock_datachannel.h",
-      "test/mock_peerconnection.h",
       "test/mock_rtpreceiverinternal.h",
       "test/mock_rtpsenderinternal.h",
       "test/mockpeerconnectionobservers.h",

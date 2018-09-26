@@ -37,7 +37,6 @@ class MockVoEChannelProxy : public voe::ChannelProxy {
       void(rtc::FunctionView<void(std::unique_ptr<AudioEncoder>*)> modifier));
   MOCK_METHOD1(SetRTCPStatus, void(bool enable));
   MOCK_METHOD1(SetLocalSSRC, void(uint32_t ssrc));
-  MOCK_METHOD1(SetRemoteSSRC, void(uint32_t ssrc));
   MOCK_METHOD1(SetRTCP_CNAME, void(const std::string& c_name));
   MOCK_METHOD2(SetNACKStatus, void(bool enable, int max_packets));
   MOCK_METHOD2(SetSendAudioLevelIndicationStatus, void(bool enable, int id));
@@ -68,7 +67,6 @@ class MockVoEChannelProxy : public voe::ChannelProxy {
   MOCK_METHOD1(OnRtpPacket, void(const RtpPacketReceived& packet));
   MOCK_METHOD2(ReceivedRTCPPacket, bool(const uint8_t* packet, size_t length));
   MOCK_METHOD1(SetChannelOutputVolumeScaling, void(float scaling));
-  MOCK_METHOD1(SetRtcEventLog, void(RtcEventLog* event_log));
   MOCK_METHOD2(GetAudioFrameWithInfo,
                AudioMixer::Source::AudioFrameInfo(int sample_rate_hz,
                                                   AudioFrame* audio_frame));

@@ -27,11 +27,15 @@ class ErleEstimator {
   ErleEstimator(float min_erle, float max_erle_lf, float max_erle_hf);
   ~ErleEstimator();
 
+  // Reset the ERLE estimator.
+  void Reset();
+
   // Updates the ERLE estimate.
   void Update(rtc::ArrayView<const float> render_spectrum,
               rtc::ArrayView<const float> capture_spectrum,
               rtc::ArrayView<const float> subtractor_spectrum,
-              bool converged_filter);
+              bool converged_filter,
+              bool onset_detection);
 
   // Returns the most recent ERLE estimate.
   const std::array<float, kFftLengthBy2Plus1>& Erle() const { return erle_; }

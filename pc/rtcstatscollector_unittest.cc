@@ -586,12 +586,12 @@ class RTCStatsCollectorTest : public testing::Test {
     graph.sender = stats_->SetupLocalTrackAndSender(
         cricket::MEDIA_TYPE_VIDEO, "LocalVideoTrackID", 3, false);
     graph.sender_track_id = "RTCMediaStreamTrack_sender_" +
-                            rtc::ToString<>(graph.sender->AttachmentId());
+                            rtc::ToString(graph.sender->AttachmentId());
     // track (receiver) and stream (remote stream)
     graph.receiver = stats_->SetupRemoteTrackAndReceiver(
         cricket::MEDIA_TYPE_VIDEO, "RemoteVideoTrackID", "RemoteStreamId", 4);
     graph.receiver_track_id = "RTCMediaStreamTrack_receiver_" +
-                              rtc::ToString<>(graph.receiver->AttachmentId());
+                              rtc::ToString(graph.receiver->AttachmentId());
     graph.remote_stream_id = "RTCMediaStream_RemoteStreamId";
     // peer-connection
     graph.peer_connection_id = "RTCPeerConnection";
@@ -1121,7 +1121,7 @@ TEST_F(RTCStatsCollectorTest, CollectRTCIceCandidatePairStats) {
                                          report->timestamp_us());
   expected_pair.transport_id =
       "RTCTransport_transport_" +
-      rtc::ToString<>(cricket::ICE_CANDIDATE_COMPONENT_RTP);
+      rtc::ToString(cricket::ICE_CANDIDATE_COMPONENT_RTP);
   expected_pair.local_candidate_id = "RTCIceCandidate_" + local_candidate->id();
   expected_pair.remote_candidate_id =
       "RTCIceCandidate_" + remote_candidate->id();
@@ -1605,6 +1605,7 @@ TEST_F(RTCStatsCollectorTest, CollectRTCInboundRTPStreamStats_Audio) {
   expected_audio.ssrc = 1;
   expected_audio.is_remote = false;
   expected_audio.media_type = "audio";
+  expected_audio.kind = "audio";
   expected_audio.track_id = stats_of_track_type[0]->id();
   expected_audio.transport_id = "RTCTransport_TransportName_1";
   expected_audio.codec_id = "RTCCodec_AudioMid_Inbound_42";
@@ -1660,6 +1661,7 @@ TEST_F(RTCStatsCollectorTest, CollectRTCInboundRTPStreamStats_Video) {
   expected_video.ssrc = 1;
   expected_video.is_remote = false;
   expected_video.media_type = "video";
+  expected_video.kind = "video";
   expected_video.track_id = IdForType<RTCMediaStreamTrackStats>(report);
   expected_video.transport_id = "RTCTransport_TransportName_1";
   expected_video.codec_id = "RTCCodec_VideoMid_Inbound_42";
@@ -1724,6 +1726,7 @@ TEST_F(RTCStatsCollectorTest, CollectRTCOutboundRTPStreamStats_Audio) {
   expected_audio.ssrc = 1;
   expected_audio.is_remote = false;
   expected_audio.media_type = "audio";
+  expected_audio.kind = "audio";
   expected_audio.track_id = IdForType<RTCMediaStreamTrackStats>(report);
   expected_audio.transport_id = "RTCTransport_TransportName_1";
   expected_audio.codec_id = "RTCCodec_AudioMid_Outbound_42";
@@ -1784,6 +1787,7 @@ TEST_F(RTCStatsCollectorTest, CollectRTCOutboundRTPStreamStats_Video) {
   expected_video.ssrc = 1;
   expected_video.is_remote = false;
   expected_video.media_type = "video";
+  expected_video.kind = "video";
   expected_video.track_id = stats_of_track_type[0]->id();
   expected_video.transport_id = "RTCTransport_TransportName_1";
   expected_video.codec_id = "RTCCodec_VideoMid_Outbound_42";
@@ -1853,7 +1857,7 @@ TEST_F(RTCStatsCollectorTest, CollectRTCTransportStats) {
 
   RTCTransportStats expected_rtp_transport(
       "RTCTransport_transport_" +
-          rtc::ToString<>(cricket::ICE_CANDIDATE_COMPONENT_RTP),
+          rtc::ToString(cricket::ICE_CANDIDATE_COMPONENT_RTP),
       report->timestamp_us());
   expected_rtp_transport.bytes_sent = 42;
   expected_rtp_transport.bytes_received = 1337;
@@ -1883,7 +1887,7 @@ TEST_F(RTCStatsCollectorTest, CollectRTCTransportStats) {
 
   RTCTransportStats expected_rtcp_transport(
       "RTCTransport_transport_" +
-          rtc::ToString<>(cricket::ICE_CANDIDATE_COMPONENT_RTCP),
+          rtc::ToString(cricket::ICE_CANDIDATE_COMPONENT_RTCP),
       report->timestamp_us());
   expected_rtcp_transport.bytes_sent = 1337;
   expected_rtcp_transport.bytes_received = 42;
@@ -1984,6 +1988,7 @@ TEST_F(RTCStatsCollectorTest, CollectNoStreamRTCOutboundRTPStreamStats_Audio) {
   expected_audio.ssrc = 1;
   expected_audio.is_remote = false;
   expected_audio.media_type = "audio";
+  expected_audio.kind = "audio";
   expected_audio.track_id = IdForType<RTCMediaStreamTrackStats>(report);
   expected_audio.transport_id = "RTCTransport_TransportName_1";
   expected_audio.codec_id = "RTCCodec_AudioMid_Outbound_42";

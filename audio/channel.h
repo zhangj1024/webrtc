@@ -21,6 +21,7 @@
 #include "api/audio_codecs/audio_encoder.h"
 #include "api/call/audio_sink.h"
 #include "api/call/transport.h"
+#include "api/rtpreceiverinterface.h"
 #include "audio/audio_level.h"
 #include "call/syncable.h"
 #include "common_types.h"  // NOLINT(build/include)
@@ -28,8 +29,8 @@
 #include "modules/audio_processing/rms_level.h"
 #include "modules/rtp_rtcp/include/remote_ntp_time_estimator.h"
 #include "modules/rtp_rtcp/include/rtp_header_parser.h"
-#include "modules/rtp_rtcp/include/rtp_receiver.h"
 #include "modules/rtp_rtcp/include/rtp_rtcp.h"
+#include "modules/rtp_rtcp/source/contributing_sources.h"
 #include "rtc_base/criticalsection.h"
 #include "rtc_base/event.h"
 #include "rtc_base/task_queue.h"
@@ -52,8 +53,6 @@ class RateLimiter;
 class ReceiveStatistics;
 class RemoteNtpTimeEstimator;
 class RtcEventLog;
-class RTPPayloadRegistry;
-class RTPReceiverAudio;
 class RtpPacketReceived;
 class RtpRtcp;
 class RtpTransportControllerSendInterface;
@@ -80,7 +79,7 @@ struct ReportBlock {
   uint32_t sender_SSRC;  // SSRC of sender
   uint32_t source_SSRC;
   uint8_t fraction_lost;
-  uint32_t cumulative_num_packets_lost;
+  int32_t cumulative_num_packets_lost;
   uint32_t extended_highest_sequence_number;
   uint32_t interarrival_jitter;
   uint32_t last_SR_timestamp;
@@ -89,7 +88,6 @@ struct ReportBlock {
 
 namespace voe {
 
-class RtcEventLogProxy;
 class RtpPacketSenderProxy;
 class TransportFeedbackProxy;
 class TransportSequenceNumberProxy;
@@ -150,11 +148,14 @@ class Channel
   Channel(rtc::TaskQueue* encoder_queue,
           ProcessThread* module_process_thread,
           AudioDeviceModule* audio_device_module,
-          RtcpRttStats* rtcp_rtt_stats);
+          RtcpRttStats* rtcp_rtt_stats,
+          RtcEventLog* rtc_event_log);
   // Used for receive streams.
   Channel(ProcessThread* module_process_thread,
           AudioDeviceModule* audio_device_module,
           RtcpRttStats* rtcp_rtt_stats,
+          RtcEventLog* rtc_event_log,
+          uint32_t remote_ssrc,
           size_t jitter_buffer_max_packets,
           bool jitter_buffer_fast_playout,
           rtc::scoped_refptr<AudioDecoderFactory> decoder_factory,
@@ -222,7 +223,6 @@ class Channel
 
   // RTP+RTCP
   int SetLocalSSRC(unsigned int ssrc);
-  void SetRemoteSSRC(uint32_t ssrc);
 
   void SetMid(const std::string& mid, int extension_id);
   int SetSendAudioLevelIndicationStatus(bool enable, unsigned char id);
@@ -285,9 +285,6 @@ class Channel
   // Used for obtaining RTT for a receive-only channel.
   void SetAssociatedSendChannel(Channel* channel);
 
-  // Set a RtcEventLog logging object.
-  void SetRtcEventLog(RtcEventLog* event_log);
-
   void SetTransportOverhead(size_t transport_overhead_per_packet);
 
   // From OverheadObserver in the RTP/RTCP module
@@ -301,9 +298,7 @@ class Channel
 
   void OnRecoverableUplinkPacketLossRate(float recoverable_packet_loss_rate);
 
-  std::vector<RtpSource> GetSources() const {
-    return rtp_receiver_->GetSources();
-  }
+  std::vector<RtpSource> GetSources() const;
 
  private:
   class ProcessAndEncodeAudioTask;
@@ -318,7 +313,6 @@ class Channel
   bool ReceivePacket(const uint8_t* packet,
                      size_t packet_length,
                      const RTPHeader& header);
-  bool IsPacketRetransmitted(const RTPHeader& header) const;
   int ResendPackets(const uint16_t* sequence_numbers, int length);
   void UpdatePlayoutTimestamp(bool rtcp);
 
@@ -341,12 +335,26 @@ class Channel
 
   ChannelState channel_state_;
 
-  std::unique_ptr<voe::RtcEventLogProxy> event_log_proxy_;
+  RtcEventLog* const event_log_;
 
-  std::unique_ptr<RTPPayloadRegistry> rtp_payload_registry_;
+  // Indexed by payload type.
+  std::map<uint8_t, int> payload_type_frequencies_;
+
   std::unique_ptr<ReceiveStatistics> rtp_receive_statistics_;
-  std::unique_ptr<RtpReceiver> rtp_receiver_;
   std::unique_ptr<RtpRtcp> _rtpRtcpModule;
+  const uint32_t remote_ssrc_;
+
+  // Info for GetSources and GetSyncInfo is updated on network or worker thread,
+  // queried on the worker thread.
+  rtc::CriticalSection rtp_sources_lock_;
+  ContributingSources contributing_sources_ RTC_GUARDED_BY(&rtp_sources_lock_);
+  absl::optional<uint32_t> last_received_rtp_timestamp_
+      RTC_GUARDED_BY(&rtp_sources_lock_);
+  absl::optional<int64_t> last_received_rtp_system_time_ms_
+      RTC_GUARDED_BY(&rtp_sources_lock_);
+  absl::optional<uint8_t> last_received_rtp_audio_level_
+      RTC_GUARDED_BY(&rtp_sources_lock_);
+
   std::unique_ptr<AudioCodingModule> audio_coding_;
   AudioSinkInterface* audio_sink_ = nullptr;
   AudioLevel _outputAudioLevel;
@@ -393,7 +401,6 @@ class Channel
   rtc::CriticalSection assoc_send_channel_lock_;
   Channel* associated_send_channel_ RTC_GUARDED_BY(assoc_send_channel_lock_);
 
-  bool pacing_enabled_ = true;
   PacketRouter* packet_router_ = nullptr;
   std::unique_ptr<TransportFeedbackProxy> feedback_observer_proxy_;
   std::unique_ptr<TransportSequenceNumberProxy> seq_num_allocator_proxy_;

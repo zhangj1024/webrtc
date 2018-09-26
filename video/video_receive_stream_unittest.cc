@@ -34,9 +34,6 @@ using testing::Invoke;
 
 constexpr int kDefaultTimeOutMs = 50;
 
-const char kNewJitterBufferFieldTrialEnabled[] =
-    "WebRTC-NewVideoJitterBuffer/Enabled/";
-
 class MockTransport : public Transport {
  public:
   MOCK_METHOD3(SendRtp,
@@ -67,7 +64,6 @@ class VideoReceiveStreamTest : public testing::Test {
  public:
   VideoReceiveStreamTest()
       : process_thread_(ProcessThread::Create("TestThread")),
-        override_field_trials_(kNewJitterBufferFieldTrialEnabled),
         config_(&mock_transport_),
         call_stats_(Clock::GetRealTimeClock(), process_thread_.get()) {}
 
@@ -78,14 +74,14 @@ class VideoReceiveStreamTest : public testing::Test {
     config_.renderer = &fake_renderer_;
     VideoReceiveStream::Decoder h264_decoder;
     h264_decoder.payload_type = 99;
-    h264_decoder.payload_name = "H264";
-    h264_decoder.codec_params.insert(
+    h264_decoder.video_format = SdpVideoFormat("H264");
+    h264_decoder.video_format.parameters.insert(
         {"sprop-parameter-sets", "Z0IACpZTBYmI,aMljiA=="});
     h264_decoder.decoder = &mock_h264_video_decoder_;
     config_.decoders.push_back(h264_decoder);
     VideoReceiveStream::Decoder null_decoder;
     null_decoder.payload_type = 98;
-    null_decoder.payload_name = "null";
+    null_decoder.video_format = SdpVideoFormat("null");
     null_decoder.decoder = &mock_null_video_decoder_;
     config_.decoders.push_back(null_decoder);
 
@@ -96,7 +92,6 @@ class VideoReceiveStreamTest : public testing::Test {
 
  protected:
   std::unique_ptr<ProcessThread> process_thread_;
-  webrtc::test::ScopedFieldTrials override_field_trials_;
   VideoReceiveStream::Config config_;
   CallStats call_stats_;
   MockVideoDecoder mock_h264_video_decoder_;

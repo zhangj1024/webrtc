@@ -95,24 +95,13 @@ std::vector<std::unique_ptr<RtpRtcp>> CreateRtpRtcpModules(
   return modules;
 }
 
-absl::optional<size_t> GetSimulcastIdx(const CodecSpecificInfo* info) {
-  if (!info)
-    return absl::nullopt;
-  switch (info->codecType) {
-    case kVideoCodecVP8:
-      return absl::optional<size_t>(info->codecSpecific.VP8.simulcastIdx);
-    case kVideoCodecH264:
-      return absl::optional<size_t>(info->codecSpecific.H264.simulcast_idx);
-    case kVideoCodecMultiplex:
-    case kVideoCodecGeneric:
-      return absl::optional<size_t>(info->codecSpecific.generic.simulcast_idx);
-    default:
-      return absl::nullopt;
-  }
-}
 bool PayloadTypeSupportsSkippingFecPackets(const std::string& payload_name) {
   const VideoCodecType codecType = PayloadStringToCodecType(payload_name);
   if (codecType == kVideoCodecVP8 || codecType == kVideoCodecVP9) {
+    return true;
+  }
+  if (codecType == kVideoCodecGeneric &&
+      field_trial::IsEnabled("WebRTC-GenericPictureId")) {
     return true;
   }
   return false;
@@ -217,6 +206,9 @@ RtpVideoSender::RtpVideoSender(
   // We add the highest spatial layer first to ensure it'll be prioritized
   // when sending padding, with the hope that the packet rate will be smaller,
   // and that it's more important to protect than the lower layers.
+
+  // TODO(nisse): Consider moving registration with PacketRouter last, after the
+  // modules are fully configured.
   for (auto& rtp_rtcp : rtp_modules_) {
     constexpr bool remb_candidate = true;
     transport->packet_router()->AddSendRtpModule(rtp_rtcp.get(),
@@ -231,8 +223,7 @@ RtpVideoSender::RtpVideoSender(
     RTC_DCHECK_LE(id, 14);
     RTC_DCHECK(RtpExtension::IsSupportedForVideo(extension));
     for (auto& rtp_rtcp : rtp_modules_) {
-      RTC_CHECK_EQ(0, rtp_rtcp->RegisterSendRtpHeaderExtension(
-                          StringToRtpExtensionType(extension), id));
+      RTC_CHECK(rtp_rtcp->RegisterRtpHeaderExtension(extension, id));
     }
   }
 
@@ -316,10 +307,18 @@ EncodedImageCallback::Result RtpVideoSender::OnEncodedImage(
   if (!active_)
     return Result(Result::ERROR_SEND_FAILED);
 
-  size_t stream_index = GetSimulcastIdx(codec_specific_info).value_or(0);
+  shared_frame_id_++;
+  size_t stream_index = 0;
+  if (codec_specific_info &&
+      (codec_specific_info->codecType == kVideoCodecVP8 ||
+       codec_specific_info->codecType == kVideoCodecH264 ||
+       codec_specific_info->codecType == kVideoCodecGeneric)) {
+    // Map spatial index to simulcast.
+    stream_index = encoded_image.SpatialIndex().value_or(0);
+  }
   RTC_DCHECK_LT(stream_index, rtp_modules_.size());
   RTPVideoHeader rtp_video_header = params_[stream_index].GetRtpVideoHeader(
-      encoded_image, codec_specific_info);
+      encoded_image, codec_specific_info, shared_frame_id_);
 
   uint32_t frame_id;
   if (!rtp_modules_[stream_index]->Sending()) {
@@ -328,7 +327,7 @@ EncodedImageCallback::Result RtpVideoSender::OnEncodedImage(
   }
   bool send_result = rtp_modules_[stream_index]->SendOutgoingData(
       encoded_image._frameType, rtp_config_.payload_type,
-      encoded_image._timeStamp, encoded_image.capture_time_ms_,
+      encoded_image.Timestamp(), encoded_image.capture_time_ms_,
       encoded_image._buffer, encoded_image._length, fragmentation,
       &rtp_video_header, &frame_id);
   if (!send_result)
@@ -354,6 +353,9 @@ void RtpVideoSender::OnBitrateAllocationUpdated(
         // inactive.
         if (layer_bitrates[i]) {
           rtp_modules_[i]->SetVideoBitrateAllocation(*layer_bitrates[i]);
+        } else {
+          // Signal a 0 bitrate on a simulcast stream.
+          rtp_modules_[i]->SetVideoBitrateAllocation(VideoBitrateAllocation());
         }
       }
     }

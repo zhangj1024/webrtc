@@ -20,6 +20,8 @@
 #include "absl/types/optional.h"
 #include "api/audio_codecs/audio_encoder.h"
 #include "api/audio_options.h"
+#include "api/crypto/framedecryptorinterface.h"
+#include "api/crypto/frameencryptorinterface.h"
 #include "api/rtcerror.h"
 #include "api/rtpparameters.h"
 #include "api/rtpreceiverinterface.h"
@@ -41,6 +43,7 @@
 #include "rtc_base/networkroute.h"
 #include "rtc_base/socket.h"
 #include "rtc_base/stringencode.h"
+#include "rtc_base/strings/string_builder.h"
 #include "rtc_base/third_party/sigslot/sigslot.h"
 
 namespace rtc {
@@ -76,7 +79,7 @@ static std::string ToStringIfSet(const char* key,
 
 template <class T>
 static std::string VectorToString(const std::vector<T>& vals) {
-  std::ostringstream ost;  // no-presubmit-check TODO(webrtc:8982)
+  rtc::StringBuilder ost;  // no-presubmit-check TODO(webrtc:8982)
   ost << "[";
   for (size_t i = 0; i < vals.size(); ++i) {
     if (i > 0) {
@@ -85,7 +88,7 @@ static std::string VectorToString(const std::vector<T>& vals) {
     ost << vals[i].ToString();
   }
   ost << "]";
-  return ost.str();
+  return ost.Release();
 }
 
 // Options that can be applied to a VideoMediaChannel or a VideoMediaEngine.
@@ -110,14 +113,14 @@ struct VideoOptions {
   bool operator!=(const VideoOptions& o) const { return !(*this == o); }
 
   std::string ToString() const {
-    std::ostringstream ost;
+    rtc::StringBuilder ost;
     ost << "VideoOptions {";
     ost << ToStringIfSet("noise reduction", video_noise_reduction);
     ost << ToStringIfSet("screencast min bitrate kbps",
                          screencast_min_bitrate_kbps);
     ost << ToStringIfSet("is_screencast ", is_screencast);
     ost << "}";
-    return ost.str();
+    return ost.Release();
   }
 
   // Enable denoising? This flag comes from the getUserMedia
@@ -149,12 +152,12 @@ struct RtpHeaderExtension {
   RtpHeaderExtension(const std::string& uri, int id) : uri(uri), id(id) {}
 
   std::string ToString() const {
-    std::ostringstream ost;
+    rtc::StringBuilder ost;
     ost << "{";
     ost << "uri: " << uri;
     ost << ", id: " << id;
     ost << "}";
-    return ost.str();
+    return ost.Release();
   }
 
   std::string uri;
@@ -212,9 +215,18 @@ class MediaChannel : public sigslot::has_slots<> {
   // ssrc must be the first SSRC of the media stream if the stream uses
   // multiple SSRCs.
   virtual bool RemoveRecvStream(uint32_t ssrc) = 0;
-
   // Returns the absoulte sendtime extension id value from media channel.
   virtual int GetRtpSendTimeExtnId() const;
+  // Set the frame encryptor to use on all outgoing frames. This is optional.
+  // This pointers lifetime is managed by the set of RtpSender it is attached
+  // to.
+  virtual void SetFrameEncryptor(
+      webrtc::FrameEncryptorInterface* frame_encryptor);
+  // Set the frame decryptor to use on all incoming frames. This is optional.
+  // This pointers lifetimes is managed by the set of RtpReceivers it is
+  // attached to.
+  virtual void SetFrameDecryptor(
+      webrtc::FrameDecryptorInterface* frame_decryptor);
 
   // Base method to send packet using NetworkInterface.
   bool SendPacket(rtc::CopyOnWriteBuffer* packet,
@@ -265,6 +277,10 @@ class MediaChannel : public sigslot::has_slots<> {
   // of network_interface_ object.
   rtc::CriticalSection network_interface_crit_;
   NetworkInterface* network_interface_;
+
+ protected:
+  webrtc::FrameEncryptorInterface* frame_encryptor_ = nullptr;
+  webrtc::FrameDecryptorInterface* frame_decryptor_ = nullptr;
 };
 
 // The stats information is structured as follows:
@@ -447,7 +463,6 @@ struct VideoSenderInfo : public MediaSenderInfo {
   std::vector<SsrcGroup> ssrc_groups;
   // TODO(hbos): Move this to |VideoMediaInfo::send_codecs|?
   std::string encoder_implementation_name;
-  int packets_cached = 0;
   int firs_rcvd = 0;
   int plis_rcvd = 0;
   int nacks_rcvd = 0;
@@ -603,7 +618,7 @@ struct RtpParameters {
   RtcpParameters rtcp;
 
   std::string ToString() const {
-    std::ostringstream ost;
+    rtc::StringBuilder ost;
     ost << "{";
     const char* separator = "";
     for (const auto& entry : ToStringMap()) {
@@ -611,7 +626,7 @@ struct RtpParameters {
       separator = ", ";
     }
     ost << "}";
-    return ost.str();
+    return ost.Release();
   }
 
  protected:

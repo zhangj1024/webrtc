@@ -21,7 +21,6 @@
 #include "call/rtp_video_sender_interface.h"
 #include "common_types.h"  // NOLINT(build/include)
 #include "modules/utility/include/process_thread.h"
-#include "modules/video_coding/utility/ivf_file_writer.h"
 #include "rtc_base/weak_ptr.h"
 #include "video/call_stats.h"
 #include "video/encoder_rtcp_feedback.h"
@@ -82,9 +81,6 @@ class VideoSendStreamImpl : public webrtc::BitrateAllocatorObserver,
 
   std::map<uint32_t, RtpPayloadState> GetRtpPayloadStates() const;
 
-  void EnableEncodedFrameRecording(const std::vector<rtc::PlatformFile>& files,
-                                   size_t byte_limit);
-
   void SetTransportOverhead(size_t transport_overhead_per_packet);
 
   absl::optional<float> configured_pacing_factor_;
@@ -140,6 +136,7 @@ class VideoSendStreamImpl : public webrtc::BitrateAllocatorObserver,
   void SignalEncoderActive();
 
   const bool send_side_bwe_with_overhead_;
+  const bool has_alr_probing_;
 
   SendStatisticsProxy* const stats_proxy_;
   const VideoSendStream::Config* const config_;
@@ -156,8 +153,6 @@ class VideoSendStreamImpl : public webrtc::BitrateAllocatorObserver,
   BitrateAllocatorInterface* const bitrate_allocator_;
 
   rtc::CriticalSection ivf_writers_crit_;
-  std::unique_ptr<IvfFileWriter>
-      file_writers_[kMaxSimulcastStreams] RTC_GUARDED_BY(ivf_writers_crit_);
 
   int max_padding_bitrate_;
   int encoder_min_bitrate_bps_;
@@ -187,6 +182,16 @@ class VideoSendStreamImpl : public webrtc::BitrateAllocatorObserver,
 
   std::unordered_set<uint16_t> feedback_packet_seq_num_set_;
   std::vector<bool> loss_mask_vector_;
+
+  // Context for the most recent and last sent video bitrate allocation. Used to
+  // throttle sending of similar bitrate allocations.
+  struct VbaSendContext {
+    VideoBitrateAllocation last_sent_allocation;
+    absl::optional<VideoBitrateAllocation> throttled_allocation;
+    int64_t last_send_time_ms;
+  };
+  absl::optional<VbaSendContext> video_bitrate_allocation_context_
+      RTC_GUARDED_BY(worker_queue_);
 };
 }  // namespace internal
 }  // namespace webrtc

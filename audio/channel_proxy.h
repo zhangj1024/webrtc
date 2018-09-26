@@ -34,7 +34,6 @@ class RtcpBandwidthObserver;
 class RtcpRttStats;
 class RtpPacketSender;
 class RtpPacketReceived;
-class RtpReceiver;
 class RtpRtcp;
 class RtpTransportControllerSendInterface;
 class Transport;
@@ -62,7 +61,6 @@ class ChannelProxy : public RtpPacketSinkInterface {
 
   virtual void SetRTCPStatus(bool enable);
   virtual void SetLocalSSRC(uint32_t ssrc);
-  virtual void SetRemoteSSRC(uint32_t ssrc);
   virtual void SetMid(const std::string& mid, int extension_id);
   virtual void SetRTCP_CNAME(const std::string& c_name);
   virtual void SetNACKStatus(bool enable, int max_packets);
@@ -99,7 +97,6 @@ class ChannelProxy : public RtpPacketSinkInterface {
   void OnRtpPacket(const RtpPacketReceived& packet) override;
   virtual bool ReceivedRTCPPacket(const uint8_t* packet, size_t length);
   virtual void SetChannelOutputVolumeScaling(float scaling);
-  virtual void SetRtcEventLog(RtcEventLog* event_log);
   virtual AudioMixer::Source::AudioFrameInfo GetAudioFrameWithInfo(
       int sample_rate_hz,
       AudioFrame* audio_frame);

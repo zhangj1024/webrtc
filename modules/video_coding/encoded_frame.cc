@@ -17,9 +17,9 @@ VCMEncodedFrame::VCMEncodedFrame()
       _renderTimeMs(-1),
       _payloadType(0),
       _missingFrame(false),
-      _codec(kVideoCodecUnknown),
+      _codec(kVideoCodecGeneric),
       _rotation_set(false) {
-  _codecSpecificInfo.codecType = kVideoCodecUnknown;
+  _codecSpecificInfo.codecType = kVideoCodecGeneric;
 }
 
 VCMEncodedFrame::~VCMEncodedFrame() {
@@ -35,8 +35,8 @@ void VCMEncodedFrame::Free() {
 }
 
 void VCMEncodedFrame::Reset() {
+  SetTimestamp(0);
   _renderTimeMs = -1;
-  _timeStamp = 0;
   _payloadType = 0;
   _frameType = kVideoFrameDelta;
   _encodedWidth = 0;
@@ -44,8 +44,8 @@ void VCMEncodedFrame::Reset() {
   _completeFrame = false;
   _missingFrame = false;
   _length = 0;
-  _codecSpecificInfo.codecType = kVideoCodecUnknown;
-  _codec = kVideoCodecUnknown;
+  _codecSpecificInfo.codecType = kVideoCodecGeneric;
+  _codec = kVideoCodecGeneric;
   rotation_ = kVideoRotation_0;
   content_type_ = VideoContentType::UNSPECIFIED;
   timing_.flags = VideoSendTiming::kInvalid;
@@ -56,6 +56,8 @@ void VCMEncodedFrame::CopyCodecSpecific(const RTPVideoHeader* header) {
   if (header) {
     switch (header->codec) {
       case kVideoCodecVP8: {
+        const auto& vp8_header =
+            absl::get<RTPVideoHeaderVP8>(header->video_type_header);
         if (_codecSpecificInfo.codecType != kVideoCodecVP8) {
           // This is the first packet for this frame.
           _codecSpecificInfo.codecSpecific.VP8.temporalIdx = 0;
@@ -64,15 +66,14 @@ void VCMEncodedFrame::CopyCodecSpecific(const RTPVideoHeader* header) {
           _codecSpecificInfo.codecType = kVideoCodecVP8;
         }
         _codecSpecificInfo.codecSpecific.VP8.nonReference =
-            header->vp8().nonReference;
-        if (header->vp8().temporalIdx != kNoTemporalIdx) {
+            vp8_header.nonReference;
+        if (vp8_header.temporalIdx != kNoTemporalIdx) {
           _codecSpecificInfo.codecSpecific.VP8.temporalIdx =
-              header->vp8().temporalIdx;
-          _codecSpecificInfo.codecSpecific.VP8.layerSync =
-              header->vp8().layerSync;
+              vp8_header.temporalIdx;
+          _codecSpecificInfo.codecSpecific.VP8.layerSync = vp8_header.layerSync;
         }
-        if (header->vp8().keyIdx != kNoKeyIdx) {
-          _codecSpecificInfo.codecSpecific.VP8.keyIdx = header->vp8().keyIdx;
+        if (vp8_header.keyIdx != kNoKeyIdx) {
+          _codecSpecificInfo.codecSpecific.VP8.keyIdx = vp8_header.keyIdx;
         }
         break;
       }
@@ -82,7 +83,6 @@ void VCMEncodedFrame::CopyCodecSpecific(const RTPVideoHeader* header) {
         if (_codecSpecificInfo.codecType != kVideoCodecVP9) {
           // This is the first packet for this frame.
           _codecSpecificInfo.codecSpecific.VP9.temporal_idx = 0;
-          _codecSpecificInfo.codecSpecific.VP9.spatial_idx = 0;
           _codecSpecificInfo.codecSpecific.VP9.gof_idx = 0;
           _codecSpecificInfo.codecSpecific.VP9.inter_layer_predicted = false;
           _codecSpecificInfo.codecType = kVideoCodecVP9;
@@ -106,8 +106,6 @@ void VCMEncodedFrame::CopyCodecSpecific(const RTPVideoHeader* header) {
               vp9_header.temporal_up_switch;
         }
         if (vp9_header.spatial_idx != kNoSpatialIdx) {
-          _codecSpecificInfo.codecSpecific.VP9.spatial_idx =
-              vp9_header.spatial_idx;
           _codecSpecificInfo.codecSpecific.VP9.inter_layer_predicted =
               vp9_header.inter_layer_predicted;
         }
@@ -138,7 +136,7 @@ void VCMEncodedFrame::CopyCodecSpecific(const RTPVideoHeader* header) {
         break;
       }
       default: {
-        _codecSpecificInfo.codecType = kVideoCodecUnknown;
+        _codecSpecificInfo.codecType = kVideoCodecGeneric;
         break;
       }
     }

@@ -10,6 +10,7 @@
 
 #include "pc/rtpsender.h"
 
+#include <utility>
 #include <vector>
 
 #include "api/mediastreaminterface.h"
@@ -37,7 +38,6 @@ bool UnimplementedRtpEncodingParameterHasValue(
   if (encoding_params.codec_payload_type.has_value() ||
       encoding_params.fec.has_value() || encoding_params.rtx.has_value() ||
       encoding_params.dtx.has_value() || encoding_params.ptime.has_value() ||
-      encoding_params.max_framerate.has_value() ||
       !encoding_params.rid.empty() ||
       encoding_params.scale_resolution_down_by.has_value() ||
       encoding_params.scale_framerate_down_by.has_value() ||
@@ -82,6 +82,20 @@ bool UnimplementedRtpParameterHasValue(const RtpParameters& parameters) {
     }
   }
   return false;
+}
+
+// Attaches the frame encryptor to the media channel through an invoke on a
+// worker thread. This set must be done on the corresponding worker thread that
+// the media channel was created on.
+void AttachFrameEncryptorToMediaChannel(
+    rtc::Thread* worker_thread,
+    webrtc::FrameEncryptorInterface* frame_encryptor,
+    cricket::MediaChannel* media_channel) {
+  if (media_channel) {
+    return worker_thread->Invoke<void>(RTC_FROM_HERE, [&] {
+      media_channel->SetFrameEncryptor(frame_encryptor);
+    });
+  }
 }
 
 }  // namespace
@@ -273,6 +287,18 @@ rtc::scoped_refptr<DtmfSenderInterface> AudioRtpSender::GetDtmfSender() const {
   return dtmf_sender_proxy_;
 }
 
+void AudioRtpSender::SetFrameEncryptor(
+    rtc::scoped_refptr<FrameEncryptorInterface> frame_encryptor) {
+  frame_encryptor_ = std::move(frame_encryptor);
+  AttachFrameEncryptorToMediaChannel(worker_thread_, frame_encryptor_.get(),
+                                     media_channel_);
+}
+
+rtc::scoped_refptr<FrameEncryptorInterface> AudioRtpSender::GetFrameEncryptor()
+    const {
+  return frame_encryptor_;
+}
+
 void AudioRtpSender::SetSsrc(uint32_t ssrc) {
   TRACE_EVENT0("webrtc", "AudioRtpSender::SetSsrc");
   if (stopped_ || ssrc == ssrc_) {
@@ -312,6 +338,13 @@ void AudioRtpSender::Stop() {
   }
   media_channel_ = nullptr;
   stopped_ = true;
+}
+
+void AudioRtpSender::SetVoiceMediaChannel(
+    cricket::VoiceMediaChannel* voice_media_channel) {
+  media_channel_ = voice_media_channel;
+  AttachFrameEncryptorToMediaChannel(worker_thread_, frame_encryptor_.get(),
+                                     media_channel_);
 }
 
 void AudioRtpSender::SetAudioSend() {
@@ -469,6 +502,18 @@ rtc::scoped_refptr<DtmfSenderInterface> VideoRtpSender::GetDtmfSender() const {
   return nullptr;
 }
 
+void VideoRtpSender::SetFrameEncryptor(
+    rtc::scoped_refptr<FrameEncryptorInterface> frame_encryptor) {
+  frame_encryptor_ = std::move(frame_encryptor);
+  AttachFrameEncryptorToMediaChannel(worker_thread_, frame_encryptor_.get(),
+                                     media_channel_);
+}
+
+rtc::scoped_refptr<FrameEncryptorInterface> VideoRtpSender::GetFrameEncryptor()
+    const {
+  return frame_encryptor_;
+}
+
 void VideoRtpSender::SetSsrc(uint32_t ssrc) {
   TRACE_EVENT0("webrtc", "VideoRtpSender::SetSsrc");
   if (stopped_ || ssrc == ssrc_) {
@@ -498,6 +543,13 @@ void VideoRtpSender::Stop() {
   }
   media_channel_ = nullptr;
   stopped_ = true;
+}
+
+void VideoRtpSender::SetVideoMediaChannel(
+    cricket::VideoMediaChannel* video_media_channel) {
+  media_channel_ = video_media_channel;
+  AttachFrameEncryptorToMediaChannel(worker_thread_, frame_encryptor_.get(),
+                                     media_channel_);
 }
 
 void VideoRtpSender::SetVideoSend() {

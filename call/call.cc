@@ -114,7 +114,7 @@ std::unique_ptr<rtclog::StreamConfig> CreateRtcLogStreamConfig(
   for (const auto& d : config.decoders) {
     const int* search =
         FindKeyByValue(config.rtp.rtx_associated_payload_types, d.payload_type);
-    rtclog_config->codecs.emplace_back(d.payload_name, d.payload_type,
+    rtclog_config->codecs.emplace_back(d.video_format.name, d.payload_type,
                                        search ? *search : 0);
   }
   return rtclog_config;
@@ -170,7 +170,7 @@ class Call final : public webrtc::Call,
  public:
   Call(const Call::Config& config,
        std::unique_ptr<RtpTransportControllerSendInterface> transport_send);
-  virtual ~Call();
+  ~Call() override;
 
   // Implements webrtc::Call.
   PacketReceiver* Receiver() override;
@@ -1277,6 +1277,7 @@ PacketReceiver::DeliveryStatus Call::DeliverRtp(MediaType media_type,
       return DELIVERY_OK;
     }
   } else if (media_type == MediaType::VIDEO) {
+    parsed_packet.set_payload_type_frequency(kVideoPayloadTypeFrequency);
     if (video_receiver_controller_.OnRtpPacket(parsed_packet)) {
       received_bytes_per_second_counter_.Add(length);
       received_video_bytes_per_second_counter_.Add(length);
@@ -1327,6 +1328,7 @@ void Call::OnRecoveredPacket(const uint8_t* packet, size_t length) {
   parsed_packet.IdentifyExtensions(it->second.extensions);
 
   // TODO(brandtr): Update here when we support protecting audio packets too.
+  parsed_packet.set_payload_type_frequency(kVideoPayloadTypeFrequency);
   video_receiver_controller_.OnRtpPacket(parsed_packet);
 }
 

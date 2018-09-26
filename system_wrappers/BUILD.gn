@@ -25,8 +25,6 @@ rtc_static_library("system_wrappers") {
     "source/cpu_features.cc",
     "source/cpu_info.cc",
     "source/event.cc",
-    "source/event_timer_win.cc",
-    "source/event_timer_win.h",
     "source/rtp_to_ntp_estimator.cc",
     "source/sleep.cc",
   ]
@@ -45,13 +43,6 @@ rtc_static_library("system_wrappers") {
     "../rtc_base/system:arch",
     "//third_party/abseil-cpp/absl/types:optional",
   ]
-
-  if (is_posix || is_fuchsia) {
-    sources += [
-      "source/event_timer_posix.cc",
-      "source/event_timer_posix.h",
-    ]
-  }
 
   if (is_android) {
     defines += [ "WEBRTC_THREAD_RR" ]
@@ -106,10 +97,35 @@ rtc_source_set("cpu_features_api") {
   ]
 }
 
-rtc_source_set("field_trial_api") {
-  sources = [
+rtc_source_set("field_trial") {
+  visibility = [ "*" ]
+  public = [
     "include/field_trial.h",
+    "include/field_trial_default.h",
   ]
+  sources = [
+    "source/field_trial.cc",
+  ]
+  if (rtc_exclude_field_trial_default) {
+    defines = [ "WEBRTC_EXCLUDE_FIELD_TRIAL_DEFAULT" ]
+  }
+}
+
+# TODO(bugs.webrtc.org/9631): Remove this as soon as Chromium stop depending
+# on it.
+rtc_source_set("field_trial_api") {
+  public_deps = [  # no-presubmit-check TODO(webrtc:8603)
+    ":field_trial",
+  ]
+}
+
+# TODO(bugs.webrtc.org/9631): Remove this as soon as Chromium stop depending
+# on it.
+rtc_source_set("field_trial_default") {
+  public_deps = [  # no-presubmit-check TODO(webrtc:8603)
+    ":field_trial",
+  ]
+  visibility = [ "*" ]
 }
 
 rtc_source_set("runtime_enabled_features_api") {
@@ -119,31 +135,9 @@ rtc_source_set("runtime_enabled_features_api") {
   ]
 }
 
-rtc_source_set("metrics_api") {
-  visibility = [ "*" ]
-  sources = [
-    "include/metrics.h",
-  ]
-  deps = [
-    "..:webrtc_common",
-    "../rtc_base:checks",
-    "../rtc_base:rtc_base_approved",
-  ]
-}
-
-rtc_source_set("field_trial_default") {
-  visibility = [ "*" ]
-  sources = [
-    "include/field_trial_default.h",
-    "source/field_trial_default.cc",
-  ]
-  deps = [
-    ":field_trial_api",
-  ]
-}
-
 rtc_source_set("runtime_enabled_features_default") {
   visibility = [ "*" ]
+  configs += [ "..:no_global_constructors" ]
   sources = [
     "source/runtime_enabled_features_default.cc",
   ]
@@ -153,15 +147,40 @@ rtc_source_set("runtime_enabled_features_default") {
   ]
 }
 
+rtc_source_set("metrics") {
+  visibility = [ "*" ]
+  public = [
+    "include/metrics.h",
+    "include/metrics_default.h",
+  ]
+  sources = [
+    "source/metrics.cc",
+  ]
+  if (rtc_exclude_metrics_default) {
+    defines = [ "WEBRTC_EXCLUDE_METRICS_DEFAULT" ]
+  }
+  deps = [
+    "..:webrtc_common",
+    "../rtc_base:checks",
+    "../rtc_base:rtc_base_approved",
+  ]
+}
+
+# TODO(bugs.webrtc.org/9631): Remove this as soon as Chromium stops depending
+# on it.
+rtc_source_set("metrics_api") {
+  visibility = [ "*" ]
+  public_deps = [  # no-presubmit-check TODO(webrtc:8603)
+    ":metrics",
+  ]
+}
+
+# TODO(bugs.webrtc.org/9631): Remove this as soon as Chromium stops depending
+# on it.
 rtc_source_set("metrics_default") {
   visibility = [ "*" ]
-  sources = [
-    "include/metrics_default.h",
-    "source/metrics_default.cc",
-  ]
-  deps = [
-    ":metrics_api",
-    "../rtc_base:rtc_base_approved",
+  public_deps = [  # no-presubmit-check TODO(webrtc:8603)
+    ":metrics",
   ]
 }
 
@@ -208,10 +227,6 @@ if (rtc_include_tests) {
       "source/ntp_time_unittest.cc",
       "source/rtp_to_ntp_estimator_unittest.cc",
     ]
-
-    if (is_posix || is_fuchsia) {
-      sources += [ "source/event_timer_posix_unittest.cc" ]
-    }
 
     deps = [
       ":metrics_api",

@@ -708,6 +708,9 @@ static const char kSdpOneCandidateWithUfragPwd[] =
     "a=candidate:a0+B/1 1 udp 2130706432 192.168.1.5 1234 typ host network_name"
     " eth0 ufrag user_rtp pwd password_rtp generation 2\r\n";
 
+static const char kRawHostnameCandidate[] =
+    "candidate:a0+B/1 1 udp 2130706432 a.test 1234 typ host generation 2";
+
 // Session id and version
 static const char kSessionId[] = "18446744069414584320";
 static const char kSessionVersion[] = "18446462598732840960";
@@ -1710,7 +1713,7 @@ class WebRtcSdpTest : public testing::Test {
                             int expected_value) {
     cricket::CodecParameterMap::const_iterator found = params.find(name);
     ASSERT_TRUE(found != params.end());
-    EXPECT_EQ(found->second, rtc::ToString<int>(expected_value));
+    EXPECT_EQ(found->second, rtc::ToString(expected_value));
   }
 
   void TestDeserializeCodecParams(const CodecParams& params,
@@ -2139,6 +2142,16 @@ TEST_F(WebRtcSdpTest, SerializeCandidates) {
             message);
 }
 
+TEST_F(WebRtcSdpTest, SerializeHostnameCandidate) {
+  rtc::SocketAddress address("a.test", 1234);
+  cricket::Candidate candidate(
+      cricket::ICE_CANDIDATE_COMPONENT_RTP, "udp", address, kCandidatePriority,
+      "", "", LOCAL_PORT_TYPE, kCandidateGeneration, kCandidateFoundation1);
+  JsepIceCandidate jcandidate(std::string("audio_content_name"), 0, candidate);
+  std::string message = webrtc::SdpSerializeCandidate(jcandidate);
+  EXPECT_EQ(std::string(kRawHostnameCandidate), message);
+}
+
 // TODO(mallinath) : Enable this test once WebRTCSdp capable of parsing
 // RFC 6544.
 TEST_F(WebRtcSdpTest, SerializeTcpCandidates) {
@@ -2502,6 +2515,9 @@ TEST_F(WebRtcSdpTest, DeserializeRawCandidateAttribute) {
 
   // Candidate line with IPV6 address.
   EXPECT_TRUE(SdpDeserializeCandidate(kRawIPV6Candidate, &jcandidate));
+
+  // Candidate line with hostname address.
+  EXPECT_TRUE(SdpDeserializeCandidate(kRawHostnameCandidate, &jcandidate));
 }
 
 // This test verifies that the deserialization of an invalid candidate string
@@ -3542,6 +3558,35 @@ TEST_F(WebRtcSdpTest, IceCredentialsInCandidateStringIgnored) {
   JsepSessionDescription jdesc_output(kDummyType);
   EXPECT_TRUE(
       SdpDeserialize(kSdpWithIceCredentialsInCandidateString, &jdesc_output));
+  const IceCandidateCollection* candidates = jdesc_output.candidates(0);
+  ASSERT_NE(nullptr, candidates);
+  ASSERT_EQ(1U, candidates->count());
+  cricket::Candidate c = candidates->at(0)->candidate();
+  EXPECT_EQ("ufrag_voice", c.username());
+  EXPECT_EQ("pwd_voice", c.password());
+}
+
+// Test that attribute lines "a=ice-ufrag-something"/"a=ice-pwd-something" are
+// ignored, and only the "a=ice-ufrag"/"a=ice-pwd" attributes are used.
+// Regression test for:
+// https://bugs.chromium.org/p/webrtc/issues/detail?id=9712
+TEST_F(WebRtcSdpTest, AttributeWithPartialMatchingNameIsIgnored) {
+  static const char kSdpWithFooIceCredentials[] =
+      "v=0\r\n"
+      "o=- 18446744069414584320 18446462598732840960 IN IP4 127.0.0.1\r\n"
+      "s=-\r\n"
+      "t=0 0\r\n"
+      "m=audio 9 RTP/SAVPF 111\r\n"
+      "c=IN IP4 0.0.0.0\r\n"
+      "a=rtcp:9 IN IP4 0.0.0.0\r\n"
+      "a=ice-ufrag-something:foo\r\na=ice-pwd-something:bar\r\n"
+      "a=ice-ufrag:ufrag_voice\r\na=ice-pwd:pwd_voice\r\n"
+      "a=rtpmap:111 opus/48000/2\r\n"
+      "a=candidate:a0+B/1 1 udp 2130706432 192.168.1.5 1234 typ host "
+      "generation 2\r\n";
+
+  JsepSessionDescription jdesc_output(kDummyType);
+  EXPECT_TRUE(SdpDeserialize(kSdpWithFooIceCredentials, &jdesc_output));
   const IceCandidateCollection* candidates = jdesc_output.candidates(0);
   ASSERT_NE(nullptr, candidates);
   ASSERT_EQ(1U, candidates->count());

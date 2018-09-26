@@ -1046,6 +1046,7 @@ rtc_static_library("neteq") {
     ":neteq_decoder_enum",
     "..:module_api",
     "../..:webrtc_common",
+    "../../api:array_view",
     "../../api:libjingle_peerconnection_api",
     "../../api/audio:audio_frame_api",
     "../../api/audio_codecs:audio_codecs_api",
@@ -1089,6 +1090,7 @@ rtc_source_set("neteq_tools_minimal") {
     ":neteq",
     "../..:webrtc_common",
     "../../api:libjingle_peerconnection_api",
+    "../../api:neteq_simulator_api",
     "../../api/audio:audio_frame_api",
     "../../api/audio_codecs:audio_codecs_api",
     "../../api/audio_codecs:builtin_audio_decoder_factory",
@@ -1164,6 +1166,8 @@ rtc_source_set("neteq_tools") {
     "neteq/tools/neteq_replacement_input.h",
     "neteq/tools/neteq_stats_getter.cc",
     "neteq/tools/neteq_stats_getter.h",
+    "neteq/tools/neteq_stats_plotter.cc",
+    "neteq/tools/neteq_stats_plotter.h",
   ]
 
   if (!build_with_chromium && is_clang) {
@@ -1180,6 +1184,7 @@ rtc_source_set("neteq_tools") {
     "../../rtc_base:rtc_base_approved",
     "../rtp_rtcp",
     "../rtp_rtcp:rtp_rtcp_format",
+    "//third_party/abseil-cpp/absl/strings:strings",
     "//third_party/abseil-cpp/absl/types:optional",
   ]
 
@@ -1258,7 +1263,6 @@ if (rtc_include_tests) {
       ":audio_codec_speed_tests",
       ":audio_decoder_unittests",
       ":audio_decoder_unittests",
-      ":delay_test",
       ":g711_test",
       ":g722_test",
       ":ilbc_test",
@@ -1406,46 +1410,16 @@ if (rtc_include_tests) {
              "../../api/audio:audio_frame_api",
              "../../rtc_base:checks",
              ":audio_coding",
+             ":audio_format_conversion",
              ":neteq_tools",
              "../../api/audio_codecs:builtin_audio_decoder_factory",
+             "../../api/audio_codecs:builtin_audio_encoder_factory",
              "../../api/audio_codecs:audio_codecs_api",
              "../../rtc_base:rtc_base_approved",
              "../../test:test_support",
              "//testing/gtest",
            ]
   }
-
-  rtc_executable("delay_test") {
-    testonly = true
-    sources = [
-      "test/Channel.cc",
-      "test/Channel.h",
-      "test/PCMFile.cc",
-      "test/PCMFile.h",
-      "test/delay_test.cc",
-      "test/utility.cc",
-      "test/utility.h",
-    ]
-
-    deps = [
-      ":audio_coding",
-      ":audio_coding_module_typedefs",
-      ":audio_format_conversion",
-      "..:module_api",
-      "../../:webrtc_common",
-      "../../api/audio:audio_frame_api",
-      "../../api/audio_codecs:builtin_audio_decoder_factory",
-      "../../rtc_base:checks",
-      "../../rtc_base:rtc_base_approved",
-      "../../system_wrappers",
-      "../../system_wrappers:system_wrappers_default",
-      "../../test:fileutils",
-      "../../test:test_support",
-      "../rtp_rtcp",
-      "//testing/gtest",
-      "//third_party/abseil-cpp/absl/types:optional",
-    ]
-  }  # delay_test
 
   audio_decoder_unittests_resources =
       [ "../../resources/audio_coding/testfile32kHz.pcm" ]
@@ -1503,15 +1477,17 @@ if (rtc_include_tests) {
       proto_out_dir = "modules/audio_coding/neteq"
     }
 
-    rtc_test("neteq_rtpplay") {
+    rtc_source_set("neteq_test_factory") {
       testonly = true
+      visibility += webrtc_default_visibility
       defines = []
       deps = [
         "../../rtc_base:checks",
         "../../test:fileutils",
       ]
       sources = [
-        "neteq/tools/neteq_rtpplay.cc",
+        "neteq/tools/neteq_test_factory.cc",
+        "neteq/tools/neteq_test_factory.h",
       ]
 
       if (!build_with_chromium && is_clang) {
@@ -1526,6 +1502,22 @@ if (rtc_include_tests) {
         "../../rtc_base:rtc_base_approved",
         "../../system_wrappers:system_wrappers_default",
         "../../test:test_support",
+        "//third_party/abseil-cpp/absl/memory",
+      ]
+    }
+
+    rtc_test("neteq_rtpplay") {
+      testonly = true
+      defines = []
+      deps = [
+        ":neteq_test_factory",
+        ":neteq_test_tools",
+        "../../rtc_base:rtc_base_approved",
+        "../../system_wrappers:field_trial_default",
+        "../../test:field_trial",
+      ]
+      sources = [
+        "neteq/tools/neteq_rtpplay.cc",
       ]
     }
   }
@@ -2020,6 +2012,7 @@ if (rtc_include_tests) {
       "neteq/mock/mock_red_payload_splitter.h",
       "neteq/mock/mock_statistics_calculator.h",
       "neteq/nack_tracker_unittest.cc",
+      "neteq/neteq_decoder_plc_unittest.cc",
       "neteq/neteq_external_decoder_unittest.cc",
       "neteq/neteq_impl_unittest.cc",
       "neteq/neteq_network_stats_unittest.cc",
@@ -2090,6 +2083,8 @@ if (rtc_include_tests) {
       "../../test:rtp_test_utils",
       "../../test:test_common",
       "../../test:test_support",
+      "codecs/opus/test",
+      "codecs/opus/test:test_unittest",
       "//testing/gtest",
       "//third_party/abseil-cpp/absl/memory",
     ]

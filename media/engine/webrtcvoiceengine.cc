@@ -40,6 +40,7 @@
 #include "rtc_base/race_checker.h"
 #include "rtc_base/stringencode.h"
 #include "rtc_base/strings/audio_format_to_string.h"
+#include "rtc_base/strings/string_builder.h"
 #include "rtc_base/stringutils.h"
 #include "rtc_base/third_party/base64/base64.h"
 #include "rtc_base/trace_event.h"
@@ -52,14 +53,6 @@ namespace {
 constexpr size_t kMaxUnsignaledRecvStreams = 4;
 
 constexpr int kNackRtpHistoryMs = 5000;
-
-// Check to verify that the define for the intelligibility enhancer is properly
-// set.
-#if !defined(WEBRTC_INTELLIGIBILITY_ENHANCER) || \
-    (WEBRTC_INTELLIGIBILITY_ENHANCER != 0 &&     \
-     WEBRTC_INTELLIGIBILITY_ENHANCER != 1)
-#error "Set WEBRTC_INTELLIGIBILITY_ENHANCER to either 0 or 1"
-#endif
 
 // For SendSideBwe, Opus bitrate should be in the range between 6000 and 32000.
 const int kOpusMinBitrateBps = 6000;
@@ -103,7 +96,7 @@ bool ValidateStreamParams(const StreamParams& sp) {
 
 // Dumps an AudioCodec in RFC 2327-ish format.
 std::string ToString(const AudioCodec& codec) {
-  std::stringstream ss;
+  rtc::StringBuilder ss;
   ss << codec.name << "/" << codec.clockrate << "/" << codec.channels;
   if (!codec.params.empty()) {
     ss << " {";
@@ -113,7 +106,7 @@ std::string ToString(const AudioCodec& codec) {
     ss << " }";
   }
   ss << " (" << codec.id << ")";
-  return ss.str();
+  return ss.Release();
 }
 
 bool IsCodec(const AudioCodec& codec, const char* ref_name) {
@@ -296,7 +289,6 @@ void WebRtcVoiceEngine::Init() {
     options.extended_filter_aec = false;
     options.delay_agnostic_aec = false;
     options.experimental_ns = false;
-    options.intelligibility_enhancer = false;
     options.residual_echo_detector = true;
     bool error = ApplyOptions(options);
     RTC_DCHECK(error);
@@ -410,11 +402,6 @@ bool WebRtcVoiceEngine::ApplyOptions(const AudioOptions& options_in) {
   }
 #endif
 
-#if (WEBRTC_INTELLIGIBILITY_ENHANCER == 0)
-  // Hardcode the intelligibility enhancer to be off.
-  options.intelligibility_enhancer = false;
-#endif
-
   if (options.echo_cancellation) {
     // Check if platform supports built-in EC. Currently only supported on
     // Android and in combination with Java based audio layer.
@@ -479,19 +466,9 @@ bool WebRtcVoiceEngine::ApplyOptions(const AudioOptions& options_in) {
     webrtc::apm_helpers::SetAgcConfig(apm(), default_agc_config_);
   }
 
-  if (options.intelligibility_enhancer) {
-    intelligibility_enhancer_ = options.intelligibility_enhancer;
-  }
-  if (intelligibility_enhancer_ && *intelligibility_enhancer_) {
-    RTC_LOG(LS_INFO) << "Enabling NS when Intelligibility Enhancer is active.";
-    options.noise_suppression = intelligibility_enhancer_;
-  }
-
   if (options.noise_suppression) {
     if (adm()->BuiltInNSIsAvailable()) {
-      bool builtin_ns =
-          *options.noise_suppression &&
-          !(intelligibility_enhancer_ && *intelligibility_enhancer_);
+      bool builtin_ns = *options.noise_suppression;
       if (adm()->EnableBuiltInNS(builtin_ns) == 0 && builtin_ns) {
         // Disable internal software NS if built-in NS is enabled,
         // i.e., replace the software NS with the built-in NS.
@@ -556,13 +533,6 @@ bool WebRtcVoiceEngine::ApplyOptions(const AudioOptions& options_in) {
     RTC_LOG(LS_INFO) << "Experimental ns is enabled? " << *experimental_ns_;
     config.Set<webrtc::ExperimentalNs>(
         new webrtc::ExperimentalNs(*experimental_ns_));
-  }
-
-  if (intelligibility_enhancer_) {
-    RTC_LOG(LS_INFO) << "Intelligibility Enhancer is enabled? "
-                     << *intelligibility_enhancer_;
-    config.Set<webrtc::Intelligibility>(
-        new webrtc::Intelligibility(*intelligibility_enhancer_));
   }
 
   webrtc::AudioProcessing::Config apm_config = apm()->GetConfig();

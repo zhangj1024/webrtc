@@ -52,8 +52,8 @@ class AecDumpImpl : public AecDump {
 
   ~AecDumpImpl() override;
 
-  void WriteInitMessage(const ProcessingConfig& api_format) override;
-
+  void WriteInitMessage(const ProcessingConfig& api_format,
+                        int64_t time_now_ms) override;
   void AddCaptureStreamInput(const AudioFrameView<const float>& src) override;
   void AddCaptureStreamOutput(const AudioFrameView<const float>& src) override;
   void AddCaptureStreamInput(const AudioFrame& frame) override;
@@ -66,6 +66,9 @@ class AecDumpImpl : public AecDump {
       const AudioFrameView<const float>& src) override;
 
   void WriteConfig(const InternalAPMConfig& config) override;
+
+  void WriteRuntimeSetting(
+      const AudioProcessing::RuntimeSetting& runtime_setting) override;
 
  private:
   std::unique_ptr<WriteToFileTask> CreateWriteToFileTask();

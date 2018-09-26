@@ -33,6 +33,11 @@ namespace {
 // packet sequence number for at least last 60 seconds.
 static const int kSendSideSeqNumSetMaxSize = 5500;
 
+// Max positive size difference to treat allocations as "similar".
+static constexpr int kMaxVbaSizeDifferencePercent = 10;
+// Max time we will throttle similar video bitrate allocations.
+static constexpr int64_t kMaxVbaThrottleTimeMs = 500;
+
 // We don't do MTU discovery, so assume that we have the standard ethernet MTU.
 const size_t kPathMTU = 1500;
 
@@ -76,19 +81,35 @@ int GetEncoderMinBitrateBps() {
       kDefaultEncoderMinBitrateBps);
 }
 
-int CalculateMaxPadBitrateBps(std::vector<VideoStream> streams,
+// Calculate max padding bitrate for a multi layer codec.
+int CalculateMaxPadBitrateBps(const std::vector<VideoStream>& streams,
                               int min_transmit_bitrate_bps,
-                              bool pad_to_min_bitrate) {
+                              bool pad_to_min_bitrate,
+                              bool alr_probing) {
   int pad_up_to_bitrate_bps = 0;
-  // Calculate max padding bitrate for a multi layer codec.
-  if (streams.size() > 1) {
-    // Pad to min bitrate of the highest layer.
-    pad_up_to_bitrate_bps = streams[streams.size() - 1].min_bitrate_bps;
-    // Add target_bitrate_bps of the lower layers.
-    for (size_t i = 0; i < streams.size() - 1; ++i)
-      pad_up_to_bitrate_bps += streams[i].target_bitrate_bps;
-  } else if (pad_to_min_bitrate) {
-    pad_up_to_bitrate_bps = streams[0].min_bitrate_bps;
+
+  // Filter out only the active streams;
+  std::vector<VideoStream> active_streams;
+  for (const VideoStream& stream : streams) {
+    if (stream.active)
+      active_streams.emplace_back(stream);
+  }
+
+  if (active_streams.size() > 1) {
+    if (alr_probing) {
+      // With alr probing, just pad to the min bitrate of the lowest stream,
+      // probing will handle the rest of the rampup.
+      pad_up_to_bitrate_bps = active_streams[0].min_bitrate_bps;
+    } else {
+      // Pad to min bitrate of the highest layer.
+      pad_up_to_bitrate_bps =
+          active_streams[active_streams.size() - 1].min_bitrate_bps;
+      // Add target_bitrate_bps of the lower layers.
+      for (size_t i = 0; i < active_streams.size() - 1; ++i)
+        pad_up_to_bitrate_bps += active_streams[i].target_bitrate_bps;
+    }
+  } else if (!active_streams.empty() && pad_to_min_bitrate) {
+    pad_up_to_bitrate_bps = active_streams[0].min_bitrate_bps;
   }
 
   pad_up_to_bitrate_bps =
@@ -129,6 +150,28 @@ RtpSenderObservers CreateObservers(CallStats* call_stats,
   observers.send_packet_observer = send_delay_stats;
   observers.overhead_observer = overhead_observer;
   return observers;
+}
+
+absl::optional<AlrExperimentSettings> GetAlrSettings(
+    VideoEncoderConfig::ContentType content_type) {
+  if (content_type == VideoEncoderConfig::ContentType::kScreen) {
+    return AlrExperimentSettings::CreateFromFieldTrial(
+        AlrExperimentSettings::kScreenshareProbingBweExperimentName);
+  }
+  return AlrExperimentSettings::CreateFromFieldTrial(
+      AlrExperimentSettings::kStrictPacingAndProbingExperimentName);
+}
+
+bool SameStreamsEnabled(const VideoBitrateAllocation& lhs,
+                        const VideoBitrateAllocation& rhs) {
+  for (size_t si = 0; si < kMaxSpatialLayers; ++si) {
+    for (size_t ti = 0; ti < kMaxTemporalStreams; ++ti) {
+      if (lhs.HasBitrate(si, ti) != rhs.HasBitrate(si, ti)) {
+        return false;
+      }
+    }
+  }
+  return true;
 }
 }  // namespace
 
@@ -202,6 +245,8 @@ VideoSendStreamImpl::VideoSendStreamImpl(
     std::unique_ptr<FecController> fec_controller)
     : send_side_bwe_with_overhead_(
           webrtc::field_trial::IsEnabled("WebRTC-SendSideBwe-WithOverhead")),
+      has_alr_probing_(config->periodic_alr_bandwidth_probing ||
+                       GetAlrSettings(content_type)),
       stats_proxy_(stats_proxy),
       config_(config),
       fec_controller_(std::move(fec_controller)),
@@ -268,14 +313,8 @@ VideoSendStreamImpl::VideoSendStreamImpl(
   if (TransportSeqNumExtensionConfigured(*config_)) {
     has_packet_feedback_ = true;
 
-    absl::optional<AlrExperimentSettings> alr_settings;
-    if (content_type == VideoEncoderConfig::ContentType::kScreen) {
-      alr_settings = AlrExperimentSettings::CreateFromFieldTrial(
-          AlrExperimentSettings::kScreenshareProbingBweExperimentName);
-    } else {
-      alr_settings = AlrExperimentSettings::CreateFromFieldTrial(
-          AlrExperimentSettings::kStrictPacingAndProbingExperimentName);
-    }
+    absl::optional<AlrExperimentSettings> alr_settings =
+        GetAlrSettings(content_type);
     if (alr_settings) {
       transport->EnablePeriodicAlrProbing(true);
       transport->SetPacingFactor(alr_settings->pacing_factor);
@@ -432,7 +471,51 @@ void VideoSendStreamImpl::SignalEncoderTimedOut() {
 
 void VideoSendStreamImpl::OnBitrateAllocationUpdated(
     const VideoBitrateAllocation& allocation) {
-  rtp_video_sender_->OnBitrateAllocationUpdated(allocation);
+  if (!worker_queue_->IsCurrent()) {
+    auto ptr = weak_ptr_;
+    worker_queue_->PostTask([=] {
+      if (!ptr.get())
+        return;
+      ptr->OnBitrateAllocationUpdated(allocation);
+    });
+    return;
+  }
+
+  RTC_DCHECK_RUN_ON(worker_queue_);
+
+  int64_t now_ms = rtc::TimeMillis();
+  if (encoder_target_rate_bps_ != 0) {
+    if (video_bitrate_allocation_context_) {
+      // If new allocation is within kMaxVbaSizeDifferencePercent larger than
+      // the previously sent allocation and the same streams are still enabled,
+      // it is considered "similar". We do not want send similar allocations
+      // more once per kMaxVbaThrottleTimeMs.
+      const VideoBitrateAllocation& last =
+          video_bitrate_allocation_context_->last_sent_allocation;
+      const bool is_similar =
+          allocation.get_sum_bps() >= last.get_sum_bps() &&
+          allocation.get_sum_bps() <
+              (last.get_sum_bps() * (100 + kMaxVbaSizeDifferencePercent)) /
+                  100 &&
+          SameStreamsEnabled(allocation, last);
+      if (is_similar &&
+          (now_ms - video_bitrate_allocation_context_->last_send_time_ms) <
+              kMaxVbaThrottleTimeMs) {
+        // This allocation is too similar, cache it and return.
+        video_bitrate_allocation_context_->throttled_allocation = allocation;
+        return;
+      }
+    } else {
+      video_bitrate_allocation_context_.emplace();
+    }
+
+    video_bitrate_allocation_context_->last_sent_allocation = allocation;
+    video_bitrate_allocation_context_->throttled_allocation.reset();
+    video_bitrate_allocation_context_->last_send_time_ms = now_ms;
+
+    // Send bitrate allocation metadata only if encoder is not paused.
+    rtp_video_sender_->OnBitrateAllocationUpdated(allocation);
+  }
 }
 
 void VideoSendStreamImpl::SignalEncoderActive() {
@@ -488,7 +571,8 @@ void VideoSendStreamImpl::OnEncoderConfigurationChanged(
     max_padding_bitrate_ = streams[0].target_bitrate_bps;
   } else {
     max_padding_bitrate_ = CalculateMaxPadBitrateBps(
-        streams, min_transmit_bitrate_bps, config_->suspend_below_min_bitrate);
+        streams, min_transmit_bitrate_bps, config_->suspend_below_min_bitrate,
+        has_alr_probing_);
   }
 
   // Clear stats for disabled layers.
@@ -522,14 +606,16 @@ EncodedImageCallback::Result VideoSendStreamImpl::OnEncodedImage(
   // Encoded is called on whatever thread the real encoder implementation run
   // on. In the case of hardware encoders, there might be several encoders
   // running in parallel on different threads.
-  size_t simulcast_idx = 0;
-  if (codec_specific_info->codecType == kVideoCodecVP8) {
-    simulcast_idx = codec_specific_info->codecSpecific.VP8.simulcastIdx;
-  }
+  const size_t simulcast_idx =
+      (codec_specific_info->codecType != kVideoCodecVP9)
+          ? encoded_image.SpatialIndex().value_or(0)
+          : 0;
   if (config_->post_encode_callback) {
+    // TODO(nisse): Delete webrtc::EncodedFrame class, pass EncodedImage
+    // instead.
     config_->post_encode_callback->EncodedFrameCallback(EncodedFrame(
         encoded_image._buffer, encoded_image._length, encoded_image._frameType,
-        simulcast_idx, encoded_image._timeStamp));
+        simulcast_idx, encoded_image.Timestamp()));
   }
   {
     rtc::CritScope lock(&encoder_activity_crit_sect_);
@@ -542,18 +628,22 @@ EncodedImageCallback::Result VideoSendStreamImpl::OnEncodedImage(
   EncodedImageCallback::Result result = rtp_video_sender_->OnEncodedImage(
       encoded_image, codec_specific_info, fragmentation);
 
-  RTC_DCHECK(codec_specific_info);
-
-  int layer = codec_specific_info->codecType == kVideoCodecVP8
-                  ? codec_specific_info->codecSpecific.VP8.simulcastIdx
-                  : 0;
-  {
-    rtc::CritScope lock(&ivf_writers_crit_);
-    if (file_writers_[layer].get()) {
-      bool ok = file_writers_[layer]->WriteFrame(
-          encoded_image, codec_specific_info->codecType);
-      RTC_DCHECK(ok);
+  // Check if there's a throttled VideoBitrateAllocation that we should try
+  // sending.
+  rtc::WeakPtr<VideoSendStreamImpl> send_stream = weak_ptr_;
+  auto update_task = [send_stream]() {
+    if (send_stream) {
+      RTC_DCHECK_RUN_ON(send_stream->worker_queue_);
+      auto& context = send_stream->video_bitrate_allocation_context_;
+      if (context && context->throttled_allocation) {
+        send_stream->OnBitrateAllocationUpdated(*context->throttled_allocation);
+      }
     }
+  };
+  if (!worker_queue_->IsCurrent()) {
+    worker_queue_->PostTask(update_task);
+  } else {
+    update_task();
   }
 
   return result;
@@ -618,27 +708,6 @@ uint32_t VideoSendStreamImpl::OnBitrateUpdated(uint32_t bitrate_bps,
                                           fraction_loss, rtt);
   stats_proxy_->OnSetEncoderTargetRate(encoder_target_rate_bps_);
   return protection_bitrate;
-}
-
-void VideoSendStreamImpl::EnableEncodedFrameRecording(
-    const std::vector<rtc::PlatformFile>& files,
-    size_t byte_limit) {
-  {
-    rtc::CritScope lock(&ivf_writers_crit_);
-    for (unsigned int i = 0; i < kMaxSimulcastStreams; ++i) {
-      if (i < files.size()) {
-        file_writers_[i] = IvfFileWriter::Wrap(rtc::File(files[i]), byte_limit);
-      } else {
-        file_writers_[i].reset();
-      }
-    }
-  }
-
-  if (!files.empty()) {
-    // Make a keyframe appear as early as possible in the logs, to give actually
-    // decodable output.
-    video_stream_encoder_->SendKeyFrame();
-  }
 }
 
 int VideoSendStreamImpl::ProtectionRequest(
@@ -709,8 +778,8 @@ void VideoSendStreamImpl::OnPacketFeedbackVector(
   }
   // Lost feedbacks are not considered to be lost packets.
   for (const PacketFeedback& packet : packet_feedback_vector) {
-    if (auto it = feedback_packet_seq_num_set_.find(packet.sequence_number) !=
-                  feedback_packet_seq_num_set_.end()) {
+    auto it = feedback_packet_seq_num_set_.find(packet.sequence_number);
+    if (it != feedback_packet_seq_num_set_.end()) {
       const bool lost = packet.arrival_time_ms == PacketFeedback::kNotReceived;
       loss_mask_vector_.push_back(lost);
       feedback_packet_seq_num_set_.erase(it);

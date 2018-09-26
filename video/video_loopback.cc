@@ -243,6 +243,10 @@ DEFINE_bool(use_flexfec, false, "Use FlexFEC forward error correction.");
 
 DEFINE_bool(audio, false, "Add audio stream");
 
+DEFINE_bool(use_real_adm,
+            false,
+            "Use real ADM instead of fake (no effect if audio is false)");
+
 DEFINE_bool(audio_video_sync,
             false,
             "Sync audio and video stream (no effect if"
@@ -273,7 +277,7 @@ DEFINE_bool(help, false, "prints this message");
 }  // namespace flags
 
 void Loopback() {
-  FakeNetworkPipe::Config pipe_config;
+  DefaultNetworkSimulationConfig pipe_config;
   pipe_config.loss_percent = flags::LossPercent();
   pipe_config.avg_burst_loss_length = flags::AvgBurstLossLength();
   pipe_config.link_capacity_kbps = flags::LinkCapacityKbps();
@@ -307,7 +311,7 @@ void Loopback() {
                      flags::Clip(),
                      flags::GetCaptureDevice()};
   params.audio = {flags::FLAG_audio, flags::FLAG_audio_video_sync,
-                  flags::FLAG_audio_dtx};
+                  flags::FLAG_audio_dtx, flags::FLAG_use_real_adm};
   params.logging = {flags::FLAG_rtc_event_log_name, flags::FLAG_rtp_dump_name,
                     flags::FLAG_encoded_frame_path};
   params.screenshare[0].enabled = false;
@@ -317,7 +321,7 @@ void Loopback() {
                      flags::DurationSecs(),
                      flags::OutputFilename(),
                      flags::GraphTitle()};
-  params.pipe = pipe_config;
+  params.config = pipe_config;
 
   if (flags::NumStreams() > 1 && flags::Stream0().empty() &&
       flags::Stream1().empty()) {

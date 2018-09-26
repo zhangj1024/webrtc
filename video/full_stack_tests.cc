@@ -21,8 +21,6 @@
 namespace webrtc {
 namespace flags {
 
-DEFINE_bool(logs, false, "print logs to stderr");
-
 DEFINE_string(rtc_event_log_name,
               "",
               "Filename for rtc event log. Two files "
@@ -48,8 +46,8 @@ namespace webrtc {
 
 namespace {
 static const int kFullStackTestDurationSecs = 45;
-const char kRoundRobinPacingQueueExperiment[] =
-    "WebRTC-RoundRobinPacing/Enabled/";
+const char kScreenshareSimulcastExperiment[] =
+    "WebRTC-SimulcastScreenshare/Enabled/";
 const char kPacerPushBackExperiment[] =
     "WebRTC-PacerPushbackExperiment/Enabled/";
 
@@ -59,6 +57,7 @@ struct ParamsWithLogging : public VideoQualityTest::Params {
     // Use these logging flags by default, for everything.
     logging = {flags::RtcEventLogName(), flags::RtpDumpName(),
                flags::EncodedFramePath()};
+    this->config = DefaultNetworkSimulationConfig();
   }
 };
 
@@ -105,8 +104,8 @@ TEST(FullStackTest, ForemanCifPlr5Vp9) {
                           0,      0,       false, false, false, "foreman_cif"};
   foreman_cif.analyzer = {"foreman_cif_delay_50_0_plr_5_VP9", 0.0, 0.0,
                           kFullStackTestDurationSecs};
-  foreman_cif.pipe.loss_percent = 5;
-  foreman_cif.pipe.queue_delay_ms = 50;
+  foreman_cif.config->loss_percent = 5;
+  foreman_cif.config->queue_delay_ms = 50;
   fixture->RunWithAnalyzer(foreman_cif);
 }
 
@@ -211,7 +210,7 @@ TEST(FullStackTest, ForemanCif30kbpsWithoutPacketLoss) {
 // Link capacity below default start rate. Automatic down scaling enabled.
 TEST(FullStackTest, ForemanCifLink150kbpsWithoutPacketLoss) {
   auto fixture = CreateVideoQualityTestFixture();
-  VideoQualityTest::Params foreman_cif;
+  ParamsWithLogging foreman_cif;
   foreman_cif.call.send_side_bwe = true;
   foreman_cif.video[0] = {true,   352,     288,   30,    30000,
                           500000, 2000000, false, "VP8", 1,
@@ -219,7 +218,7 @@ TEST(FullStackTest, ForemanCifLink150kbpsWithoutPacketLoss) {
   foreman_cif.analyzer = {"foreman_cif_link_150kbps_net_delay_0_0_plr_0",
                           0.0, 0.0,
                           kFullStackTestDurationSecs};
-  foreman_cif.pipe.link_capacity_kbps = 150;
+  foreman_cif.config->link_capacity_kbps = 150;
   fixture->RunWithAnalyzer(foreman_cif);
 }
 
@@ -232,8 +231,8 @@ TEST(FullStackTest, ForemanCifPlr5) {
                           0,      0,       false, false, false, "foreman_cif"};
   foreman_cif.analyzer = {"foreman_cif_delay_50_0_plr_5", 0.0, 0.0,
                           kFullStackTestDurationSecs};
-  foreman_cif.pipe.loss_percent = 5;
-  foreman_cif.pipe.queue_delay_ms = 50;
+  foreman_cif.config->loss_percent = 5;
+  foreman_cif.config->queue_delay_ms = 50;
   fixture->RunWithAnalyzer(foreman_cif);
 }
 
@@ -246,8 +245,8 @@ TEST(FullStackTest, ForemanCifPlr5Ulpfec) {
                           0,      0,       true,  false, false, "foreman_cif"};
   foreman_cif.analyzer = {"foreman_cif_delay_50_0_plr_5_ulpfec", 0.0, 0.0,
                           kFullStackTestDurationSecs};
-  foreman_cif.pipe.loss_percent = 5;
-  foreman_cif.pipe.queue_delay_ms = 50;
+  foreman_cif.config->loss_percent = 5;
+  foreman_cif.config->queue_delay_ms = 50;
   fixture->RunWithAnalyzer(foreman_cif);
 }
 
@@ -260,8 +259,8 @@ TEST(FullStackTest, ForemanCifPlr5Flexfec) {
                           0,      0,       false, true,  false, "foreman_cif"};
   foreman_cif.analyzer = {"foreman_cif_delay_50_0_plr_5_flexfec", 0.0, 0.0,
                           kFullStackTestDurationSecs};
-  foreman_cif.pipe.loss_percent = 5;
-  foreman_cif.pipe.queue_delay_ms = 50;
+  foreman_cif.config->loss_percent = 5;
+  foreman_cif.config->queue_delay_ms = 50;
   fixture->RunWithAnalyzer(foreman_cif);
 }
 
@@ -274,9 +273,9 @@ TEST(FullStackTest, ForemanCif500kbpsPlr3Flexfec) {
                           0,      0,       false, true,  false, "foreman_cif"};
   foreman_cif.analyzer = {"foreman_cif_500kbps_delay_50_0_plr_3_flexfec", 0.0,
                           0.0, kFullStackTestDurationSecs};
-  foreman_cif.pipe.loss_percent = 3;
-  foreman_cif.pipe.link_capacity_kbps = 500;
-  foreman_cif.pipe.queue_delay_ms = 50;
+  foreman_cif.config->loss_percent = 3;
+  foreman_cif.config->link_capacity_kbps = 500;
+  foreman_cif.config->queue_delay_ms = 50;
   fixture->RunWithAnalyzer(foreman_cif);
 }
 
@@ -289,9 +288,9 @@ TEST(FullStackTest, ForemanCif500kbpsPlr3Ulpfec) {
                           0,      0,       true,  false, false, "foreman_cif"};
   foreman_cif.analyzer = {"foreman_cif_500kbps_delay_50_0_plr_3_ulpfec", 0.0,
                           0.0, kFullStackTestDurationSecs};
-  foreman_cif.pipe.loss_percent = 3;
-  foreman_cif.pipe.link_capacity_kbps = 500;
-  foreman_cif.pipe.queue_delay_ms = 50;
+  foreman_cif.config->loss_percent = 3;
+  foreman_cif.config->link_capacity_kbps = 500;
+  foreman_cif.config->queue_delay_ms = 50;
   fixture->RunWithAnalyzer(foreman_cif);
 }
 
@@ -330,8 +329,8 @@ TEST(FullStackTest, ForemanCifPlr5H264) {
                           0,      0,       false, false,  false, "foreman_cif"};
   foreman_cif.analyzer = {"foreman_cif_delay_50_0_plr_5_H264", 0.0, 0.0,
                           kFullStackTestDurationSecs};
-  foreman_cif.pipe.loss_percent = 5;
-  foreman_cif.pipe.queue_delay_ms = 50;
+  foreman_cif.config->loss_percent = 5;
+  foreman_cif.config->queue_delay_ms = 50;
   fixture->RunWithAnalyzer(foreman_cif);
 }
 
@@ -347,8 +346,8 @@ TEST(FullStackTest, ForemanCifPlr5H264SpsPpsIdrIsKeyframe) {
                           0,      0,       false, false,  false, "foreman_cif"};
   foreman_cif.analyzer = {"foreman_cif_delay_50_0_plr_5_H264_sps_pps_idr", 0.0,
                           0.0, kFullStackTestDurationSecs};
-  foreman_cif.pipe.loss_percent = 5;
-  foreman_cif.pipe.queue_delay_ms = 50;
+  foreman_cif.config->loss_percent = 5;
+  foreman_cif.config->queue_delay_ms = 50;
   fixture->RunWithAnalyzer(foreman_cif);
 }
 
@@ -362,8 +361,8 @@ TEST(FullStackTest, ForemanCifPlr5H264Flexfec) {
                           0,      0,       false, true,   false, "foreman_cif"};
   foreman_cif.analyzer = {"foreman_cif_delay_50_0_plr_5_H264_flexfec", 0.0, 0.0,
                           kFullStackTestDurationSecs};
-  foreman_cif.pipe.loss_percent = 5;
-  foreman_cif.pipe.queue_delay_ms = 50;
+  foreman_cif.config->loss_percent = 5;
+  foreman_cif.config->queue_delay_ms = 50;
   fixture->RunWithAnalyzer(foreman_cif);
 }
 
@@ -378,8 +377,8 @@ TEST(FullStackTest, DISABLED_ForemanCifPlr5H264Ulpfec) {
                           0,      0,       true,  false,  false, "foreman_cif"};
   foreman_cif.analyzer = {"foreman_cif_delay_50_0_plr_5_H264_ulpfec", 0.0, 0.0,
                           kFullStackTestDurationSecs};
-  foreman_cif.pipe.loss_percent = 5;
-  foreman_cif.pipe.queue_delay_ms = 50;
+  foreman_cif.config->loss_percent = 5;
+  foreman_cif.config->queue_delay_ms = 50;
   fixture->RunWithAnalyzer(foreman_cif);
 }
 #endif  // defined(WEBRTC_USE_H264)
@@ -393,9 +392,9 @@ TEST(FullStackTest, ForemanCif500kbps) {
                           0,      0,       false, false, false, "foreman_cif"};
   foreman_cif.analyzer = {"foreman_cif_500kbps", 0.0, 0.0,
                           kFullStackTestDurationSecs};
-  foreman_cif.pipe.queue_length_packets = 0;
-  foreman_cif.pipe.queue_delay_ms = 0;
-  foreman_cif.pipe.link_capacity_kbps = 500;
+  foreman_cif.config->queue_length_packets = 0;
+  foreman_cif.config->queue_delay_ms = 0;
+  foreman_cif.config->link_capacity_kbps = 500;
   fixture->RunWithAnalyzer(foreman_cif);
 }
 
@@ -408,9 +407,9 @@ TEST(FullStackTest, ForemanCif500kbpsLimitedQueue) {
                           0,      0,       false, false, false, "foreman_cif"};
   foreman_cif.analyzer = {"foreman_cif_500kbps_32pkts_queue", 0.0, 0.0,
                           kFullStackTestDurationSecs};
-  foreman_cif.pipe.queue_length_packets = 32;
-  foreman_cif.pipe.queue_delay_ms = 0;
-  foreman_cif.pipe.link_capacity_kbps = 500;
+  foreman_cif.config->queue_length_packets = 32;
+  foreman_cif.config->queue_delay_ms = 0;
+  foreman_cif.config->link_capacity_kbps = 500;
   fixture->RunWithAnalyzer(foreman_cif);
 }
 
@@ -423,9 +422,9 @@ TEST(FullStackTest, ForemanCif500kbps100ms) {
                           0,      0,       false, false, false, "foreman_cif"};
   foreman_cif.analyzer = {"foreman_cif_500kbps_100ms", 0.0, 0.0,
                           kFullStackTestDurationSecs};
-  foreman_cif.pipe.queue_length_packets = 0;
-  foreman_cif.pipe.queue_delay_ms = 100;
-  foreman_cif.pipe.link_capacity_kbps = 500;
+  foreman_cif.config->queue_length_packets = 0;
+  foreman_cif.config->queue_delay_ms = 100;
+  foreman_cif.config->link_capacity_kbps = 500;
   fixture->RunWithAnalyzer(foreman_cif);
 }
 
@@ -438,9 +437,9 @@ TEST(FullStackTest, ForemanCif500kbps100msLimitedQueue) {
                           0,      0,       false, false, false, "foreman_cif"};
   foreman_cif.analyzer = {"foreman_cif_500kbps_100ms_32pkts_queue", 0.0, 0.0,
                           kFullStackTestDurationSecs};
-  foreman_cif.pipe.queue_length_packets = 32;
-  foreman_cif.pipe.queue_delay_ms = 100;
-  foreman_cif.pipe.link_capacity_kbps = 500;
+  foreman_cif.config->queue_length_packets = 32;
+  foreman_cif.config->queue_delay_ms = 100;
+  foreman_cif.config->link_capacity_kbps = 500;
   fixture->RunWithAnalyzer(foreman_cif);
 }
 
@@ -453,9 +452,9 @@ TEST(FullStackTest, ForemanCif500kbps100msLimitedQueueRecvBwe) {
                           0,      0,       false, false, false, "foreman_cif"};
   foreman_cif.analyzer = {"foreman_cif_500kbps_100ms_32pkts_queue_recv_bwe",
                           0.0, 0.0, kFullStackTestDurationSecs};
-  foreman_cif.pipe.queue_length_packets = 32;
-  foreman_cif.pipe.queue_delay_ms = 100;
-  foreman_cif.pipe.link_capacity_kbps = 500;
+  foreman_cif.config->queue_length_packets = 32;
+  foreman_cif.config->queue_delay_ms = 100;
+  foreman_cif.config->link_capacity_kbps = 500;
   fixture->RunWithAnalyzer(foreman_cif);
 }
 
@@ -468,9 +467,9 @@ TEST(FullStackTest, ForemanCif1000kbps100msLimitedQueue) {
                           0,       0,       false, false, false, "foreman_cif"};
   foreman_cif.analyzer = {"foreman_cif_1000kbps_100ms_32pkts_queue", 0.0, 0.0,
                           kFullStackTestDurationSecs};
-  foreman_cif.pipe.queue_length_packets = 32;
-  foreman_cif.pipe.queue_delay_ms = 100;
-  foreman_cif.pipe.link_capacity_kbps = 1000;
+  foreman_cif.config->queue_length_packets = 32;
+  foreman_cif.config->queue_delay_ms = 100;
+  foreman_cif.config->link_capacity_kbps = 1000;
   fixture->RunWithAnalyzer(foreman_cif);
 }
 
@@ -485,9 +484,9 @@ TEST(FullStackTest, ConferenceMotionHd2000kbps100msLimitedQueue) {
       0,       0,       false, false, false, "ConferenceMotion_1280_720_50"};
   conf_motion_hd.analyzer = {"conference_motion_hd_2000kbps_100ms_32pkts_queue",
                              0.0, 0.0, kFullStackTestDurationSecs};
-  conf_motion_hd.pipe.queue_length_packets = 32;
-  conf_motion_hd.pipe.queue_delay_ms = 100;
-  conf_motion_hd.pipe.link_capacity_kbps = 2000;
+  conf_motion_hd.config->queue_length_packets = 32;
+  conf_motion_hd.config->queue_delay_ms = 100;
+  conf_motion_hd.config->link_capacity_kbps = 2000;
   fixture->RunWithAnalyzer(conf_motion_hd);
 }
 
@@ -501,10 +500,10 @@ TEST(FullStackTest, ConferenceMotionHd1TLModerateLimits) {
       -1,      0,       false, false, false, "ConferenceMotion_1280_720_50"};
   conf_motion_hd.analyzer = {"conference_motion_hd_1tl_moderate_limits", 0.0,
                              0.0, kFullStackTestDurationSecs};
-  conf_motion_hd.pipe.queue_length_packets = 50;
-  conf_motion_hd.pipe.loss_percent = 3;
-  conf_motion_hd.pipe.queue_delay_ms = 100;
-  conf_motion_hd.pipe.link_capacity_kbps = 2000;
+  conf_motion_hd.config->queue_length_packets = 50;
+  conf_motion_hd.config->loss_percent = 3;
+  conf_motion_hd.config->queue_delay_ms = 100;
+  conf_motion_hd.config->link_capacity_kbps = 2000;
   fixture->RunWithAnalyzer(conf_motion_hd);
 }
 
@@ -518,10 +517,10 @@ TEST(FullStackTest, ConferenceMotionHd2TLModerateLimits) {
       -1,      0,       false, false, false, "ConferenceMotion_1280_720_50"};
   conf_motion_hd.analyzer = {"conference_motion_hd_2tl_moderate_limits", 0.0,
                              0.0, kFullStackTestDurationSecs};
-  conf_motion_hd.pipe.queue_length_packets = 50;
-  conf_motion_hd.pipe.loss_percent = 3;
-  conf_motion_hd.pipe.queue_delay_ms = 100;
-  conf_motion_hd.pipe.link_capacity_kbps = 2000;
+  conf_motion_hd.config->queue_length_packets = 50;
+  conf_motion_hd.config->loss_percent = 3;
+  conf_motion_hd.config->queue_delay_ms = 100;
+  conf_motion_hd.config->link_capacity_kbps = 2000;
   fixture->RunWithAnalyzer(conf_motion_hd);
 }
 
@@ -535,10 +534,10 @@ TEST(FullStackTest, ConferenceMotionHd3TLModerateLimits) {
       -1,      0,       false, false, false, "ConferenceMotion_1280_720_50"};
   conf_motion_hd.analyzer = {"conference_motion_hd_3tl_moderate_limits", 0.0,
                              0.0, kFullStackTestDurationSecs};
-  conf_motion_hd.pipe.queue_length_packets = 50;
-  conf_motion_hd.pipe.loss_percent = 3;
-  conf_motion_hd.pipe.queue_delay_ms = 100;
-  conf_motion_hd.pipe.link_capacity_kbps = 2000;
+  conf_motion_hd.config->queue_length_packets = 50;
+  conf_motion_hd.config->loss_percent = 3;
+  conf_motion_hd.config->queue_delay_ms = 100;
+  conf_motion_hd.config->link_capacity_kbps = 2000;
   fixture->RunWithAnalyzer(conf_motion_hd);
 }
 
@@ -552,10 +551,10 @@ TEST(FullStackTest, ConferenceMotionHd4TLModerateLimits) {
       -1,      0,       false, false, false, "ConferenceMotion_1280_720_50"};
   conf_motion_hd.analyzer = {"conference_motion_hd_4tl_moderate_limits", 0.0,
                              0.0, kFullStackTestDurationSecs};
-  conf_motion_hd.pipe.queue_length_packets = 50;
-  conf_motion_hd.pipe.loss_percent = 3;
-  conf_motion_hd.pipe.queue_delay_ms = 100;
-  conf_motion_hd.pipe.link_capacity_kbps = 2000;
+  conf_motion_hd.config->queue_length_packets = 50;
+  conf_motion_hd.config->loss_percent = 3;
+  conf_motion_hd.config->queue_delay_ms = 100;
+  conf_motion_hd.config->link_capacity_kbps = 2000;
   fixture->RunWithAnalyzer(conf_motion_hd);
 }
 
@@ -571,10 +570,10 @@ TEST(FullStackTest, ConferenceMotionHd3TLModerateLimitsAltTLPattern) {
       -1,      0,       false, false, false, "ConferenceMotion_1280_720_50"};
   conf_motion_hd.analyzer = {"conference_motion_hd_3tl_alt_moderate_limits",
                              0.0, 0.0, kFullStackTestDurationSecs};
-  conf_motion_hd.pipe.queue_length_packets = 50;
-  conf_motion_hd.pipe.loss_percent = 3;
-  conf_motion_hd.pipe.queue_delay_ms = 100;
-  conf_motion_hd.pipe.link_capacity_kbps = 2000;
+  conf_motion_hd.config->queue_length_packets = 50;
+  conf_motion_hd.config->loss_percent = 3;
+  conf_motion_hd.config->queue_delay_ms = 100;
+  conf_motion_hd.config->link_capacity_kbps = 2000;
   fixture->RunWithAnalyzer(conf_motion_hd);
 }
 
@@ -590,9 +589,9 @@ TEST(FullStackTest, ConferenceMotionHd2000kbps100msLimitedQueueVP9) {
   conf_motion_hd.analyzer = {
       "conference_motion_hd_2000kbps_100ms_32pkts_queue_vp9", 0.0, 0.0,
       kFullStackTestDurationSecs};
-  conf_motion_hd.pipe.queue_length_packets = 32;
-  conf_motion_hd.pipe.queue_delay_ms = 100;
-  conf_motion_hd.pipe.link_capacity_kbps = 2000;
+  conf_motion_hd.config->queue_length_packets = 32;
+  conf_motion_hd.config->queue_delay_ms = 100;
+  conf_motion_hd.config->link_capacity_kbps = 2000;
   fixture->RunWithAnalyzer(conf_motion_hd);
 }
 #endif
@@ -612,6 +611,7 @@ TEST(FullStackTest, ScreenshareSlidesVP8_2TL) {
 
 TEST(FullStackTest, ScreenshareSlidesVP8_3TL_Simulcast) {
   auto fixture = CreateVideoQualityTestFixture();
+  test::ScopedFieldTrials field_trial(kScreenshareSimulcastExperiment);
   ParamsWithLogging screenshare;
   screenshare.call.send_side_bwe = true;
   screenshare.screenshare[0] = {true, false, 10};
@@ -661,9 +661,9 @@ TEST(FullStackTest, ScreenshareSlidesVP8_2TL_LossyNet) {
   screenshare.screenshare[0] = {true, false, 10};
   screenshare.analyzer = {"screenshare_slides_lossy_net", 0.0, 0.0,
                           kFullStackTestDurationSecs};
-  screenshare.pipe.loss_percent = 5;
-  screenshare.pipe.queue_delay_ms = 200;
-  screenshare.pipe.link_capacity_kbps = 500;
+  screenshare.config->loss_percent = 5;
+  screenshare.config->queue_delay_ms = 200;
+  screenshare.config->link_capacity_kbps = 500;
   fixture->RunWithAnalyzer(screenshare);
 }
 
@@ -677,9 +677,9 @@ TEST(FullStackTest, ScreenshareSlidesVP8_2TL_VeryLossyNet) {
   screenshare.screenshare[0] = {true, false, 10};
   screenshare.analyzer = {"screenshare_slides_very_lossy", 0.0, 0.0,
                           kFullStackTestDurationSecs};
-  screenshare.pipe.loss_percent = 10;
-  screenshare.pipe.queue_delay_ms = 200;
-  screenshare.pipe.link_capacity_kbps = 500;
+  screenshare.config->loss_percent = 10;
+  screenshare.config->queue_delay_ms = 200;
+  screenshare.config->link_capacity_kbps = 500;
   fixture->RunWithAnalyzer(screenshare);
 }
 
@@ -693,9 +693,9 @@ TEST(FullStackTest, ScreenshareSlidesVP8_2TL_LossyNetRestrictedQueue) {
   screenshare.screenshare[0] = {true, false, 10};
   screenshare.analyzer = {"screenshare_slides_lossy_limited", 0.0, 0.0,
                           kFullStackTestDurationSecs};
-  screenshare.pipe.loss_percent = 5;
-  screenshare.pipe.link_capacity_kbps = 200;
-  screenshare.pipe.queue_length_packets = 30;
+  screenshare.config->loss_percent = 5;
+  screenshare.config->link_capacity_kbps = 200;
+  screenshare.config->queue_length_packets = 30;
 
   fixture->RunWithAnalyzer(screenshare);
 }
@@ -710,9 +710,9 @@ TEST(FullStackTest, ScreenshareSlidesVP8_2TL_ModeratelyRestricted) {
   screenshare.screenshare[0] = {true, false, 10};
   screenshare.analyzer = {"screenshare_slides_moderately_restricted", 0.0, 0.0,
                           kFullStackTestDurationSecs};
-  screenshare.pipe.loss_percent = 1;
-  screenshare.pipe.link_capacity_kbps = 1200;
-  screenshare.pipe.queue_length_packets = 30;
+  screenshare.config->loss_percent = 1;
+  screenshare.config->link_capacity_kbps = 1200;
+  screenshare.config->queue_length_packets = 30;
 
   fixture->RunWithAnalyzer(screenshare);
 }
@@ -837,7 +837,7 @@ TEST(FullStackTest, VP9KSVC_3SL_Low) {
 
 TEST(FullStackTest, VP9KSVC_3SL_Medium_Network_Restricted) {
   auto fixture = CreateVideoQualityTestFixture();
-  VideoQualityTest::Params simulcast;
+  ParamsWithLogging simulcast;
   simulcast.call.send_side_bwe = true;
   simulcast.video[0] = kSvcVp9Video;
   simulcast.analyzer = {"vp9ksvc_3sl_medium_network_restricted", 0.0, 0.0,
@@ -845,7 +845,7 @@ TEST(FullStackTest, VP9KSVC_3SL_Medium_Network_Restricted) {
   simulcast.ss[0] = {
       std::vector<VideoStream>(),  0,    3, 1, InterLayerPredMode::kOnKeyPic,
       std::vector<SpatialLayer>(), false};
-  simulcast.pipe.link_capacity_kbps = 1000;
+  simulcast.config->link_capacity_kbps = 1000;
   fixture->RunWithAnalyzer(simulcast);
 }
 #endif  // !defined(WEBRTC_MAC)
@@ -869,8 +869,8 @@ TEST(FullStackTest, MAYBE_SimulcastFullHdOveruse) {
                         2,       400000,  false, false, false, "Generator"};
   simulcast.analyzer = {"simulcast_HD_high", 0.0, 0.0,
                         kFullStackTestDurationSecs};
-  simulcast.pipe.loss_percent = 0;
-  simulcast.pipe.queue_delay_ms = 100;
+  simulcast.config->loss_percent = 0;
+  simulcast.config->queue_delay_ms = 100;
   std::vector<VideoStream> streams = {
     VideoQualityTest::DefaultVideoStream(simulcast, 0),
     VideoQualityTest::DefaultVideoStream(simulcast, 0),
@@ -891,8 +891,8 @@ TEST(FullStackTest, SimulcastVP8_3SL_High) {
   simulcast.video[0] = kSimulcastVp8VideoHigh;
   simulcast.analyzer = {"simulcast_vp8_3sl_high", 0.0, 0.0,
                         kFullStackTestDurationSecs};
-  simulcast.pipe.loss_percent = 0;
-  simulcast.pipe.queue_delay_ms = 100;
+  simulcast.config->loss_percent = 0;
+  simulcast.config->queue_delay_ms = 100;
   ParamsWithLogging video_params_high;
   video_params_high.video[0] = kSimulcastVp8VideoHigh;
   ParamsWithLogging video_params_medium;
@@ -917,8 +917,8 @@ TEST(FullStackTest, SimulcastVP8_3SL_Medium) {
   simulcast.video[0] = kSimulcastVp8VideoHigh;
   simulcast.analyzer = {"simulcast_vp8_3sl_medium", 0.0, 0.0,
                         kFullStackTestDurationSecs};
-  simulcast.pipe.loss_percent = 0;
-  simulcast.pipe.queue_delay_ms = 100;
+  simulcast.config->loss_percent = 0;
+  simulcast.config->queue_delay_ms = 100;
   ParamsWithLogging video_params_high;
   video_params_high.video[0] = kSimulcastVp8VideoHigh;
   ParamsWithLogging video_params_medium;
@@ -943,8 +943,8 @@ TEST(FullStackTest, SimulcastVP8_3SL_Low) {
   simulcast.video[0] = kSimulcastVp8VideoHigh;
   simulcast.analyzer = {"simulcast_vp8_3sl_low", 0.0, 0.0,
                         kFullStackTestDurationSecs};
-  simulcast.pipe.loss_percent = 0;
-  simulcast.pipe.queue_delay_ms = 100;
+  simulcast.config->loss_percent = 0;
+  simulcast.config->queue_delay_ms = 100;
   ParamsWithLogging video_params_high;
   video_params_high.video[0] = kSimulcastVp8VideoHigh;
   ParamsWithLogging video_params_medium;
@@ -969,8 +969,8 @@ TEST(FullStackTest, LargeRoomVP8_5thumb) {
   large_room.video[0] = kSimulcastVp8VideoHigh;
   large_room.analyzer = {"largeroom_5thumb", 0.0, 0.0,
                          kFullStackTestDurationSecs};
-  large_room.pipe.loss_percent = 0;
-  large_room.pipe.queue_delay_ms = 100;
+  large_room.config->loss_percent = 0;
+  large_room.config->queue_delay_ms = 100;
   ParamsWithLogging video_params_high;
   video_params_high.video[0] = kSimulcastVp8VideoHigh;
   ParamsWithLogging video_params_medium;
@@ -1006,8 +1006,8 @@ TEST(FullStackTest, MAYBE_LargeRoomVP8_15thumb) {
   large_room.video[0] = kSimulcastVp8VideoHigh;
   large_room.analyzer = {"largeroom_15thumb", 0.0, 0.0,
                          kFullStackTestDurationSecs};
-  large_room.pipe.loss_percent = 0;
-  large_room.pipe.queue_delay_ms = 100;
+  large_room.config->loss_percent = 0;
+  large_room.config->queue_delay_ms = 100;
   ParamsWithLogging video_params_high;
   video_params_high.video[0] = kSimulcastVp8VideoHigh;
   ParamsWithLogging video_params_medium;
@@ -1033,8 +1033,8 @@ TEST(FullStackTest, MAYBE_LargeRoomVP8_50thumb) {
   large_room.video[0] = kSimulcastVp8VideoHigh;
   large_room.analyzer = {"largeroom_50thumb", 0.0, 0.0,
                          kFullStackTestDurationSecs};
-  large_room.pipe.loss_percent = 0;
-  large_room.pipe.queue_delay_ms = 100;
+  large_room.config->loss_percent = 0;
+  large_room.config->queue_delay_ms = 100;
   ParamsWithLogging video_params_high;
   video_params_high.video[0] = kSimulcastVp8VideoHigh;
   ParamsWithLogging video_params_medium;
@@ -1060,8 +1060,8 @@ class DualStreamsTest : public ::testing::TestWithParam<int> {};
 TEST_P(DualStreamsTest,
        ModeratelyRestricted_SlidesVp8_3TL_Simulcast_Video_Simulcast_High) {
   test::ScopedFieldTrials field_trial(
-      AppendFieldTrials(std::string(kRoundRobinPacingQueueExperiment) +
-                        std::string(kPacerPushBackExperiment)));
+      AppendFieldTrials(std::string(kPacerPushBackExperiment) +
+                        std::string(kScreenshareSimulcastExperiment)));
   const int first_stream = GetParam();
   ParamsWithLogging dual_streams;
 
@@ -1112,10 +1112,10 @@ TEST_P(DualStreamsTest,
   std::string test_label = "dualstreams_moderately_restricted_screenshare_" +
                            std::to_string(first_stream);
   dual_streams.analyzer = {test_label, 0.0, 0.0, kFullStackTestDurationSecs};
-  dual_streams.pipe.loss_percent = 1;
-  dual_streams.pipe.link_capacity_kbps = 7500;
-  dual_streams.pipe.queue_length_packets = 30;
-  dual_streams.pipe.queue_delay_ms = 100;
+  dual_streams.config->loss_percent = 1;
+  dual_streams.config->link_capacity_kbps = 7500;
+  dual_streams.config->queue_length_packets = 30;
+  dual_streams.config->queue_delay_ms = 100;
 
   auto fixture = CreateVideoQualityTestFixture();
   fixture->RunWithAnalyzer(dual_streams);
@@ -1124,8 +1124,7 @@ TEST_P(DualStreamsTest,
 
 TEST_P(DualStreamsTest, Conference_Restricted) {
   test::ScopedFieldTrials field_trial(
-      AppendFieldTrials(std::string(kRoundRobinPacingQueueExperiment) +
-                        std::string(kPacerPushBackExperiment)));
+      AppendFieldTrials(std::string(kPacerPushBackExperiment)));
   const int first_stream = GetParam();
   ParamsWithLogging dual_streams;
 
@@ -1147,10 +1146,10 @@ TEST_P(DualStreamsTest, Conference_Restricted) {
   std::string test_label = "dualstreams_conference_restricted_screenshare_" +
                            std::to_string(first_stream);
   dual_streams.analyzer = {test_label, 0.0, 0.0, kFullStackTestDurationSecs};
-  dual_streams.pipe.loss_percent = 1;
-  dual_streams.pipe.link_capacity_kbps = 5000;
-  dual_streams.pipe.queue_length_packets = 30;
-  dual_streams.pipe.queue_delay_ms = 100;
+  dual_streams.config->loss_percent = 1;
+  dual_streams.config->link_capacity_kbps = 5000;
+  dual_streams.config->queue_length_packets = 30;
+  dual_streams.config->queue_delay_ms = 100;
 
   auto fixture = CreateVideoQualityTestFixture();
   fixture->RunWithAnalyzer(dual_streams);
