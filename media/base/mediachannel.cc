@@ -39,6 +39,10 @@ void MediaChannel::SetFrameDecryptor(
   frame_decryptor_ = frame_decryptor;
 }
 
+bool MediaChannel::AddFileStream(const std::string& file) {
+  return false;
+}
+
 MediaSenderInfo::MediaSenderInfo() = default;
 MediaSenderInfo::~MediaSenderInfo() = default;
 

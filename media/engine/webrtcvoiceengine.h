@@ -208,6 +208,7 @@ class WebRtcVoiceMediaChannel final : public VoiceMediaChannel,
     rtc::PacketOptions rtc_options;
     return VoiceMediaChannel::SendRtcp(&packet, rtc_options);
   }
+  bool AddFileStream(const std::string& file) override;
 
  private:
   bool SetOptions(const AudioOptions& options);
@@ -282,6 +283,8 @@ class WebRtcVoiceMediaChannel final : public VoiceMediaChannel,
   // TODO(kwiberg): Per-SSRC codec pair IDs?
   const webrtc::AudioCodecPairId codec_pair_id_ =
       webrtc::AudioCodecPairId::Create();
+
+  webrtc::WebRtcVoiceFileStream* fileStream = NULL;
 
   RTC_DISALLOW_IMPLICIT_CONSTRUCTORS(WebRtcVoiceMediaChannel);
 };

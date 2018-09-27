@@ -383,6 +383,7 @@ void InitializeCaptureFrame(int input_sample_rate,
   audio_frame->num_channels_ = std::min(input_num_channels, send_num_channels);
 }
 
+
 bool FileAudioDevice::RecThreadProcess() {
   if (!_recording) {
     return false;

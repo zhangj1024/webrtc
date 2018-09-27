@@ -266,6 +266,8 @@ rtc_static_library("rtc_audio_video") {
     "engine/webrtcvideoengine.h",
     "engine/webrtcvoiceengine.cc",
     "engine/webrtcvoiceengine.h",
+    "engine/webrtcvoicefilestream.cc",
+    "engine/webrtcvoicefilestream.h",
   ]
 
   if (!build_with_chromium && is_clang) {

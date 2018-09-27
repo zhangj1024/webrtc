@@ -32,6 +32,8 @@
 
 namespace webrtc {
 
+class WebRtcVoiceFileStream;
+
 // A Call instance can contain several send and/or receive streams. All streams
 // are assumed to have the same remote endpoint and will share bitrate estimates
 // etc.
@@ -86,6 +88,9 @@ class Call {
       const FlexfecReceiveStream::Config& config) = 0;
   virtual void DestroyFlexfecReceiveStream(
       FlexfecReceiveStream* receive_stream) = 0;
+
+  virtual WebRtcVoiceFileStream* CreateFileStream() = 0;
+  virtual void DestroyFileStream(AudioReceiveStream* receive_stream) = 0;
 
   // All received RTP and RTCP packets for the call should be inserted to this
   // PacketReceiver. The PacketReceiver pointer is valid as long as the

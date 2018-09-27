@@ -583,6 +583,8 @@ void Conductor::OnSuccess(webrtc::SessionDescriptionInterface* desc) {
   peer_connection_->SetLocalDescription(
       DummySetSessionDescriptionObserver::Create(), desc);
 
+  peer_connection_->AddFileStream(std::string("F://1_1channel.pcm")); 
+
   std::string sdp;
   desc->ToString(&sdp);
 

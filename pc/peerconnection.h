@@ -267,6 +267,7 @@ class PeerConnection : public PeerConnectionInternal,
 
   void EnableSendVideo(bool enable) override;
   void EnableSendAudio(bool enable) override;
+  bool AddFileStream(const std::string& file) override;
 
  protected:
   ~PeerConnection() override;

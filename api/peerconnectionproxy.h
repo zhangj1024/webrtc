@@ -135,6 +135,7 @@ PROXY_METHOD0(void, StopRtcEventLog)
 PROXY_METHOD0(void, Close)
 PROXY_METHOD1(void, EnableSendVideo, bool)
 PROXY_METHOD1(void, EnableSendAudio, bool)
+PROXY_METHOD1(bool, AddFileStream, const std::string&)
 END_PROXY_MAP()
 
 }  // namespace webrtc

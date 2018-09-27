@@ -59,6 +59,9 @@ class DegradedCall : public Call, private Transport, private PacketReceiver {
   void DestroyFlexfecReceiveStream(
       FlexfecReceiveStream* receive_stream) override;
 
+  webrtc::WebRtcVoiceFileStream* CreateFileStream() override;
+  void DestroyFileStream(webrtc::AudioReceiveStream* receive_stream) override;
+
   PacketReceiver* Receiver() override;
 
   RtpTransportControllerSendInterface* GetTransportControllerSend() override;

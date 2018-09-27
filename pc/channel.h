@@ -186,6 +186,8 @@ class BaseChannel : public rtc::MessageHandler,
   bool EnableReceive() const { return enableReceive_; }
   void SetEnableReceive(bool enable);
 
+  bool AddFileStream(const std::string& file);
+
  protected:
   virtual MediaChannel* media_channel() const { return media_channel_.get(); }
 
@@ -258,6 +260,9 @@ class BaseChannel : public rtc::MessageHandler,
   bool RemoveRecvStream_w(uint32_t ssrc);
   bool AddSendStream_w(const StreamParams& sp);
   bool RemoveSendStream_w(uint32_t ssrc);
+
+  bool AddFileStream_w(const std::string& file);
+
 
   // Should be called whenever the conditions for
   // IsReadyToReceiveMedia/IsReadyToSendMedia are satisfied (or unsatisfied).

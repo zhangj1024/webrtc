@@ -6319,4 +6319,18 @@ void PeerConnection::EnableSendAudio(bool enable) {
   EnableChannelSend(GetTransceiverChannel(GetFirstAudioTransceiver()), enable);
 }
 
+bool PeerConnection::AddFileStream(const std::string& file) {
+  // get audio channel
+  for (auto transceiver : transceivers_) {
+    if (transceiver->media_type() == cricket::MEDIA_TYPE_AUDIO) {
+      cricket::BaseChannel* channel = transceiver->internal()->channel();
+      if (channel) {
+        return channel->AddFileStream(file);
+      }
+    }
+  }
+
+  return false;
+}
+
 }  // namespace webrtc

@@ -65,6 +65,7 @@
 #include "video/stats_counter.h"
 #include "video/video_receive_stream.h"
 #include "video/video_send_stream.h"
+#include "media/engine/webrtcvoicefilestream.h"
 
 namespace webrtc {
 
@@ -202,6 +203,9 @@ class Call final : public webrtc::Call,
       const FlexfecReceiveStream::Config& config) override;
   void DestroyFlexfecReceiveStream(
       FlexfecReceiveStream* receive_stream) override;
+
+  webrtc::WebRtcVoiceFileStream* CreateFileStream() override;
+  void DestroyFileStream(webrtc::AudioReceiveStream* receive_stream) override;
 
   RtpTransportControllerSendInterface* GetTransportControllerSend() override;
 
@@ -906,6 +910,17 @@ void Call::DestroyFlexfecReceiveStream(FlexfecReceiveStream* receive_stream) {
   }
 
   delete receive_stream;
+}
+
+webrtc::WebRtcVoiceFileStream* Call::CreateFileStream(
+    /*VideoReceiveStream::Config configuration*/) {
+  webrtc::WebRtcVoiceFileStream* receive_stream =
+      new WebRtcVoiceFileStream(config_.audio_state, event_log_);
+  return receive_stream;
+}
+
+void Call::DestroyFileStream(webrtc::AudioReceiveStream* file_stream) {
+  DestroyAudioReceiveStream(file_stream);
 }
 
 RtpTransportControllerSendInterface* Call::GetTransportControllerSend() {

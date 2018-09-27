@@ -46,6 +46,7 @@
 #include "rtc_base/trace_event.h"
 #include "system_wrappers/include/field_trial.h"
 #include "system_wrappers/include/metrics.h"
+#include "media/engine/webrtcvoicefilestream.h"
 
 namespace cricket {
 namespace {
@@ -1279,6 +1280,10 @@ WebRtcVoiceMediaChannel::~WebRtcVoiceMediaChannel() {
   while (!recv_streams_.empty()) {
     RemoveRecvStream(recv_streams_.begin()->first);
   }
+  if (fileStream != NULL) {
+    fileStream->Stop();
+    delete fileStream;
+  }
   engine()->UnregisterChannel(this);
 }
 
@@ -1898,6 +1903,18 @@ bool WebRtcVoiceMediaChannel::RemoveRecvStream(uint32_t ssrc) {
   it->second->SetRawAudioSink(nullptr);
   delete it->second;
   recv_streams_.erase(it);
+  return true;
+}
+
+bool WebRtcVoiceMediaChannel::AddFileStream(const std::string& file) {
+  if (fileStream == NULL) {
+    fileStream = call_->CreateFileStream();
+  }
+
+  fileStream->SetPlayFile(file);
+
+  fileStream->Start();
+
   return true;
 }
 

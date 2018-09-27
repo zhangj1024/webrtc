@@ -585,6 +585,11 @@ bool BaseChannel::RemoveRecvStream_w(uint32_t ssrc) {
   return media_channel()->RemoveRecvStream(ssrc);
 }
 
+bool BaseChannel::AddFileStream_w(const std::string& file) {
+  RTC_DCHECK(worker_thread() == rtc::Thread::Current());
+  return media_channel()->AddFileStream(file);
+}
+
 bool BaseChannel::UpdateLocalStreams_w(const std::vector<StreamParams>& streams,
                                        SdpType type,
                                        std::string* error_desc) {
@@ -786,6 +791,11 @@ void BaseChannel::DisableReceive_w() {
   RTC_LOG(LS_INFO) << "Channel receive disabled";
   enableReceive_ = false;
   UpdateMediaSendRecvState_w();
+}
+
+bool BaseChannel::AddFileStream(const std::string& file) {
+ return worker_thread_->Invoke<bool>(RTC_FROM_HERE,
+                               Bind(&BaseChannel::AddFileStream_w, this, file));
 }
 
 VoiceChannel::VoiceChannel(rtc::Thread* worker_thread,

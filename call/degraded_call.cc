@@ -130,6 +130,14 @@ void DegradedCall::DestroyFlexfecReceiveStream(
   call_->DestroyFlexfecReceiveStream(receive_stream);
 }
 
+webrtc::WebRtcVoiceFileStream* DegradedCall::CreateFileStream() {
+  return call_->CreateFileStream();
+}
+
+void DegradedCall::DestroyFileStream(webrtc::AudioReceiveStream* file_stream) {
+  call_->DestroyFileStream(file_stream);
+}
+
 PacketReceiver* DegradedCall::Receiver() {
   if (receive_config_) {
     return this;
