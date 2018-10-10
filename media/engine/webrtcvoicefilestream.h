@@ -12,23 +12,18 @@
 
 namespace webrtc {
 
-class WebRtcVoiceFileStream final : public webrtc::AudioReceiveStream,
-                                    public AudioMixer::Source,
-                                    public Syncable {
+class WebRtcVoiceFileStream final : public AudioMixer::Source,
+                                    public AudioTick {
  public:
   WebRtcVoiceFileStream(
       const rtc::scoped_refptr<webrtc::AudioState>& audio_state,
       webrtc::RtcEventLog* event_log);
   ~WebRtcVoiceFileStream() override;
 
-  // webrtc::AudioReceiveStream implementation.
-  void Reconfigure(const webrtc::AudioReceiveStream::Config& config) override;
-  void Start() override;
-  void Stop() override;
-  webrtc::AudioReceiveStream::Stats GetStats() const override;
-  void SetSink(AudioSinkInterface* sink) override;
-  void SetGain(float gain) override;
-  std::vector<webrtc::RtpSource> GetSources() const override;
+  void Start();
+  void Stop();
+  void SetSink(AudioSinkInterface* sink);
+  void SetGain(float gain);
 
   // AudioMixer::Source
   AudioFrameInfo GetAudioFrameWithInfo(int sample_rate_hz,
@@ -36,16 +31,10 @@ class WebRtcVoiceFileStream final : public webrtc::AudioReceiveStream,
   int Ssrc() const override;
   int PreferredSampleRate() const override;
 
-  // Syncable
-  int id() const override;
-  absl::optional<Syncable::Info> GetInfo() const override;
-  uint32_t GetPlayoutTimestamp() const override;
-  void SetMinimumPlayoutDelay(int delay_ms) override;
-
-  void AssociateSendStream(AudioSendStream* send_stream);
-  void SignalNetworkState(NetworkState state);
-
   void SetPlayFile(const std::string &file);
+
+  void OnTick() override {};
+
  private:
   internal::AudioState* audio_state() const;
   rtc::scoped_refptr<webrtc::AudioState> audio_state_;
@@ -55,8 +44,6 @@ class WebRtcVoiceFileStream final : public webrtc::AudioReceiveStream,
   std::string _inputFilename;
   FileWrapper& _inputFile;
   int16_t* _recordingBuffer = NULL;  // In bytes.
-
-  //   int current_sample_rate_hz = 44100;
 
   rtc::CriticalSection crit_sect_;
 

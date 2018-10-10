@@ -27,6 +27,7 @@ namespace webrtc {
 
 class AudioSendStream;
 class AudioReceiveStream;
+class WebRtcVoiceFileStream;
 
 namespace internal {
 
@@ -59,12 +60,18 @@ class AudioState final : public webrtc::AudioState {
                         size_t num_channels);
   void RemoveSendingStream(webrtc::AudioSendStream* stream);
 
+  void AddFileStream(webrtc::WebRtcVoiceFileStream* stream);
+  void RemoveFileStream(webrtc::WebRtcVoiceFileStream* stream);
+
  private:
   // rtc::RefCountInterface implementation.
   void AddRef() const override;
   rtc::RefCountReleaseStatus Release() const override;
 
   void UpdateAudioTransportWithSendingStreams();
+
+  void InitRecording();
+  void InitPlayout();
 
   rtc::ThreadChecker thread_checker_;
   rtc::ThreadChecker process_thread_checker_;

@@ -173,6 +173,8 @@ class AudioDeviceWindowsCore : public AudioDeviceGeneric {
  public:
   virtual void AttachAudioBuffer(AudioDeviceBuffer* audioBuffer);
 
+  void RegisterTickCallback(AudioTick* tick) { tick_ = tick; };
+
  private:
   bool KeyPressed() const;
 
@@ -313,6 +315,7 @@ class AudioDeviceWindowsCore : public AudioDeviceGeneric {
   uint16_t _outputDeviceIndex;
 
   mutable char _str[512];
+  AudioTick* tick_;
 };
 
 #endif  // #if (_MSC_VER >= 1400)

@@ -133,6 +133,11 @@ void AudioMixerImpl::Mix(size_t number_of_channels,
   return;
 }
 
+int AudioMixerImpl::SourceCnt() {
+  rtc::CritScope lock(&crit_);
+  return audio_source_list_.size();
+}
+
 void AudioMixerImpl::CalculateOutputFrequency() {
   RTC_DCHECK_RUNS_SERIALIZED(&race_checker_);
   rtc::CritScope lock(&crit_);

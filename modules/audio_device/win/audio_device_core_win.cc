@@ -432,7 +432,8 @@ AudioDeviceWindowsCore::AudioDeviceWindowsCore()
       _inputDevice(AudioDeviceModule::kDefaultCommunicationDevice),
       _outputDevice(AudioDeviceModule::kDefaultCommunicationDevice),
       _inputDeviceIndex(0),
-      _outputDeviceIndex(0) {
+      _outputDeviceIndex(0),
+      tick_(NULL) {
   RTC_LOG(LS_INFO) << __FUNCTION__ << " created";
   assert(_comInit.succeeded());
 
@@ -3222,6 +3223,8 @@ DWORD AudioDeviceWindowsCore::DoCaptureThread() {
       DWORD flags = 0;
       UINT64 recTime = 0;
       UINT64 recPos = 0;
+
+	  tick_->OnTick();
 
       _Lock();
 

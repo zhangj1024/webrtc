@@ -9,13 +9,13 @@
  */
 
 #include "modules/audio_device/dummy/file_audio_device.h"
+#include "api/audio/audio_frame.h"
+#include "audio/remix_resample.h"
+#include "modules/audio_processing/include/audio_processing.h"
 #include "rtc_base/checks.h"
 #include "rtc_base/logging.h"
 #include "rtc_base/platform_thread.h"
 #include "system_wrappers/include/sleep.h"
-#include "api/audio/audio_frame.h"
-#include "audio/remix_resample.h"
-#include "modules/audio_processing/include/audio_processing.h"
 
 namespace webrtc {
 
@@ -367,22 +367,6 @@ bool FileAudioDevice::RecThreadFunc(void* pThis) {
   return (static_cast<FileAudioDevice*>(pThis)->RecThreadProcess());
 }
 
-void InitializeCaptureFrame(int input_sample_rate,
-                            int send_sample_rate_hz,
-                            size_t input_num_channels,
-                            size_t send_num_channels,
-                            AudioFrame* audio_frame) {
-  RTC_DCHECK(audio_frame);
-  int min_processing_rate_hz = std::min(input_sample_rate, send_sample_rate_hz);
-  for (int native_rate_hz : AudioProcessing::kNativeSampleRatesHz) {
-    audio_frame->sample_rate_hz_ = native_rate_hz;
-    if (audio_frame->sample_rate_hz_ >= min_processing_rate_hz) {
-      break;
-    }
-  }
-  audio_frame->num_channels_ = std::min(input_num_channels, send_num_channels);
-}
-
 bool FileAudioDevice::RecThreadProcess() {
   if (!_recording) {
     return false;
@@ -397,6 +381,7 @@ bool FileAudioDevice::RecThreadProcess() {
   if (deltaTimeMillis > 0) {
     SleepMs(deltaTimeMillis);
   }
+  _critSect.Enter();
 
   if (_inputFile.is_open()) {
     if (_inputFile.Read(_recordingBuffer, kRecordingBufferSize) > 0) {
@@ -422,25 +407,23 @@ bool FileAudioDevice::RecThreadProcess() {
       audio_frame->num_channels_ = kRecordingNumChannels;
       audio_frame->sample_rate_hz_ = kRecordingFixedSampleRate48000;
 
-      InitializeCaptureFrame(
-          kRecordingFixedSampleRate, kRecordingFixedSampleRate,
-                             kRecordingNumChannels, audio_frame->num_channels_,
-                             audio_frame.get());
-
       voe::RemixAndResample(_recordingBuffer, _recordingFramesIn10MS,
                             kRecordingNumChannels, kRecordingFixedSampleRate,
                             &resampler, audio_frame.get());
 
-	_ptrAudioBuffer->SetRecordedBuffer(audio_frame->mutable_data(),
+      _ptrAudioBuffer->SetRecordedBuffer(audio_frame->mutable_data(),
                                          audio_frame->samples_per_channel_);
 #endif
     } else {
       _inputFile.Rewind();
     }
     _lastCallRecordMillis += 10;
+    _critSect.Leave();
     _ptrAudioBuffer->DeliverRecordedData();
+    _critSect.Enter();
   }
 
+  _critSect.Leave();
   return true;
 }
 

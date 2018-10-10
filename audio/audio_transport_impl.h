@@ -17,6 +17,7 @@
 #include "audio/audio_level.h"
 #include "common_audio/resampler/include/push_resampler.h"
 #include "modules/audio_device/include/audio_device.h"
+#include "modules/audio_mixer/frame_combiner.h"
 #include "modules/audio_processing/include/audio_processing.h"
 #include "modules/audio_processing/typing_detection.h"
 #include "rtc_base/constructormagic.h"
@@ -27,10 +28,13 @@
 namespace webrtc {
 
 class AudioSendStream;
+class InternalAudioSource;
 
 class AudioTransportImpl : public AudioTransport {
  public:
-  AudioTransportImpl(AudioMixer* mixer, AudioProcessing* audio_processing);
+  AudioTransportImpl(AudioMixer* mixer,
+                     AudioMixer* record_mixer,
+                     AudioProcessing* audio_processing);
   ~AudioTransportImpl() override;
 
   int32_t RecordedDataIsAvailable(const void* audioSamples,
@@ -52,7 +56,7 @@ class AudioTransportImpl : public AudioTransport {
                            size_t& nSamplesOut,
                            int64_t* elapsed_time_ms,
                            int64_t* ntp_time_ms) override;
-
+#ifdef ChromiumWebrtc
   void PullRenderData(int bits_per_sample,
                       int sample_rate,
                       size_t number_of_channels,
@@ -60,6 +64,7 @@ class AudioTransportImpl : public AudioTransport {
                       void* audio_data,
                       int64_t* elapsed_time_ms,
                       int64_t* ntp_time_ms) override;
+#endif  // ChromiumWebrtc
 
   void UpdateSendingStreams(std::vector<AudioSendStream*> streams,
                             int send_sample_rate_hz,
@@ -84,10 +89,14 @@ class AudioTransportImpl : public AudioTransport {
   TypingDetection typing_detection_;
 
   // Render side.
-  rtc::scoped_refptr<AudioMixer> mixer_;
-  AudioFrame mixed_frame_;
+  rtc::scoped_refptr<AudioMixer> play_mixer_;
+  AudioFrame play_mixed_frame_;
   // Converts mixed audio to the audio device output rate.
   PushResampler<int16_t> render_resampler_;
+
+  InternalAudioSource* record_source_;
+  rtc::scoped_refptr<AudioMixer> record_mixer_;
+  AudioFrame record_mixed_frame_;
 
   RTC_DISALLOW_IMPLICIT_CONSTRUCTORS(AudioTransportImpl);
 };

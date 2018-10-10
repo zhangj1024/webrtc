@@ -60,6 +60,8 @@ class AudioMixerImpl : public AudioMixer {
            AudioFrame* audio_frame_for_mixing) override
       RTC_LOCKS_EXCLUDED(crit_);
 
+  int SourceCnt() override;
+
   // Returns true if the source was mixed last round. Returns
   // false and logs an error if the source was never added to the
   // mixer.

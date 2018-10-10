@@ -37,6 +37,8 @@ class AudioState : public rtc::RefCountInterface {
 
     // TODO(solenberg): Temporary: audio device module.
     rtc::scoped_refptr<webrtc::AudioDeviceModule> audio_device_module;
+
+	rtc::scoped_refptr<AudioMixer> record_audio_mixer;
   };
 
   struct Stats {

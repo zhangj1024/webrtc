@@ -27,7 +27,9 @@ namespace internal {
 
 AudioState::AudioState(const AudioState::Config& config)
     : config_(config),
-      audio_transport_(config_.audio_mixer, config_.audio_processing.get()) {
+      audio_transport_(config_.audio_mixer,
+                       config_.record_audio_mixer,
+                       config_.audio_processing.get()) {
   process_thread_checker_.DetachFromThread();
   RTC_DCHECK(config_.audio_mixer);
   RTC_DCHECK(config_.audio_device_module);
@@ -62,17 +64,7 @@ void AudioState::AddReceivingStream(webrtc::AudioReceiveStream* stream) {
     RTC_DLOG(LS_ERROR) << "Failed to add source to mixer.";
   }
 
-  // Make sure playback is initialized; start playing if enabled.
-  auto* adm = config_.audio_device_module.get();
-  if (!adm->Playing()) {
-    if (adm->InitPlayout() == 0) {
-      if (playout_enabled_) {
-        adm->StartPlayout();
-      }
-    } else {
-      RTC_DLOG_F(LS_ERROR) << "Failed to initialize playout.";
-    }
-  }
+  InitPlayout();
 }
 
 void AudioState::RemoveReceivingStream(webrtc::AudioReceiveStream* stream) {
@@ -95,17 +87,7 @@ void AudioState::AddSendingStream(webrtc::AudioSendStream* stream,
   properties.num_channels = num_channels;
   UpdateAudioTransportWithSendingStreams();
 
-  // Make sure recording is initialized; start recording if enabled.
-  auto* adm = config_.audio_device_module.get();
-  if (!adm->Recording()) {
-    if (adm->InitRecording() == 0) {
-      if (recording_enabled_) {
-        adm->StartRecording();
-      }
-    } else {
-      RTC_DLOG_F(LS_ERROR) << "Failed to initialize recording.";
-    }
-  }
+  InitRecording();
 }
 
 void AudioState::RemoveSendingStream(webrtc::AudioSendStream* stream) {
@@ -116,6 +98,37 @@ void AudioState::RemoveSendingStream(webrtc::AudioSendStream* stream) {
   if (sending_streams_.empty()) {
     config_.audio_device_module->StopRecording();
   }
+}
+
+void AudioState::AddFileStream(webrtc::WebRtcVoiceFileStream* stream) {
+  RTC_DCHECK(thread_checker_.CalledOnValidThread());
+
+//   receiving_streams_.insert((webrtc::AudioReceiveStream*)stream);
+//   if (!config_.audio_mixer->AddSource((AudioMixer::Source*)stream)) {
+//     RTC_DLOG(LS_ERROR) << "Failed to add source to mixer.";
+//   }
+
+  if (!config_.record_audio_mixer->AddSource((AudioMixer::Source*)stream)) {
+    RTC_DLOG(LS_ERROR) << "Failed to add source to record_audio_mixer.";
+  }
+
+  InitPlayout();
+  InitRecording();
+
+  auto* adm = config_.audio_device_module.get();
+  adm->RegisterTickCallback((AudioTick *)stream);
+}
+
+void AudioState::RemoveFileStream(webrtc::WebRtcVoiceFileStream* stream) {
+  RTC_DCHECK(thread_checker_.CalledOnValidThread());
+  receiving_streams_.erase((webrtc::AudioReceiveStream*)stream);
+  config_.record_audio_mixer->RemoveSource((AudioMixer::Source*)stream);
+  if (receiving_streams_.empty()) {
+    config_.audio_device_module->StopPlayout();
+  }
+
+  auto* adm = config_.audio_device_module.get();
+  adm->RegisterTickCallback(NULL);
 }
 
 void AudioState::SetPlayout(bool enabled) {
@@ -195,6 +208,33 @@ void AudioState::UpdateAudioTransportWithSendingStreams() {
   audio_transport_.UpdateSendingStreams(std::move(sending_streams),
                                         max_sample_rate_hz, max_num_channels);
 }
+void AudioState::InitRecording() {
+  // Make sure recording is initialized; start recording if enabled.
+  auto* adm = config_.audio_device_module.get();
+  if (!adm->Recording()) {
+    if (adm->InitRecording() == 0) {
+      if (recording_enabled_) {
+        adm->StartRecording();
+      }
+    } else {
+      RTC_DLOG_F(LS_ERROR) << "Failed to initialize recording.";
+    }
+  }
+}
+void AudioState::InitPlayout() {
+  // Make sure playback is initialized; start playing if enabled.
+  auto* adm = config_.audio_device_module.get();
+  if (!adm->Playing()) {
+    if (adm->InitPlayout() == 0) {
+      if (playout_enabled_) {
+        adm->StartPlayout();
+      }
+    } else {
+      RTC_DLOG_F(LS_ERROR) << "Failed to initialize playout.";
+    }
+  }
+}
+
 }  // namespace internal
 
 rtc::scoped_refptr<AudioState> AudioState::Create(

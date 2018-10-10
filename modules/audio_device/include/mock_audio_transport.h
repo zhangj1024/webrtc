@@ -44,6 +44,7 @@ class MockAudioTransport : public AudioTransport {
                        int64_t* elapsed_time_ms,
                        int64_t* ntp_time_ms));
 
+#ifdef ChromiumWebrtc
   MOCK_METHOD7(PullRenderData,
                void(int bits_per_sample,
                     int sample_rate,
@@ -53,6 +54,7 @@ class MockAudioTransport : public AudioTransport {
                     int64_t* elapsed_time_ms,
                     int64_t* ntp_time_ms));
 };
+#endif //ChromiumWebrtc
 
 }  // namespace test
 }  // namespace webrtc

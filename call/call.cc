@@ -912,8 +912,7 @@ void Call::DestroyFlexfecReceiveStream(FlexfecReceiveStream* receive_stream) {
   delete receive_stream;
 }
 
-webrtc::WebRtcVoiceFileStream* Call::CreateFileStream(
-    /*VideoReceiveStream::Config configuration*/) {
+webrtc::WebRtcVoiceFileStream* Call::CreateFileStream() {
   webrtc::WebRtcVoiceFileStream* receive_stream =
       new WebRtcVoiceFileStream(config_.audio_state, event_log_);
   return receive_stream;

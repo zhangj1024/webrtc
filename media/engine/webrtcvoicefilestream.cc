@@ -36,9 +36,6 @@ WebRtcVoiceFileStream::~WebRtcVoiceFileStream() {
   delete &_inputFile;
 }
 
-void WebRtcVoiceFileStream::Reconfigure(
-    const webrtc::WebRtcVoiceFileStream::Config& config) {}
-
 void WebRtcVoiceFileStream::Start() {
   if (playing_) {
     return;
@@ -55,7 +52,7 @@ void WebRtcVoiceFileStream::Start() {
   }
 
   playing_ = true;
-  audio_state()->AddReceivingStream(this);
+  audio_state()->AddFileStream(this);
 }
 
 void WebRtcVoiceFileStream::Stop() {
@@ -63,38 +60,15 @@ void WebRtcVoiceFileStream::Stop() {
     return;
   }
   playing_ = false;
-  audio_state()->RemoveReceivingStream(this);
+  audio_state()->RemoveFileStream(this);
 
   _inputFile.CloseFile();
 }
 
-webrtc::WebRtcVoiceFileStream::Stats WebRtcVoiceFileStream::GetStats() const {
-  webrtc::WebRtcVoiceFileStream::Stats stats;
-  return stats;
-}
-
 void WebRtcVoiceFileStream::SetSink(AudioSinkInterface* sink) {}
 
-void WebRtcVoiceFileStream::SetGain(float gain) {}
-
-std::vector<RtpSource> WebRtcVoiceFileStream::GetSources() const {
-  return std::vector<RtpSource>();
-}
-
-void InitializeCaptureFrame(int input_sample_rate,
-                            int send_sample_rate_hz,
-                            size_t input_num_channels,
-                            size_t send_num_channels,
-                            AudioFrame* audio_frame) {
-  RTC_DCHECK(audio_frame);
-  int min_processing_rate_hz = std::min(input_sample_rate, send_sample_rate_hz);
-  for (int native_rate_hz : AudioProcessing::kNativeSampleRatesHz) {
-    audio_frame->sample_rate_hz_ = native_rate_hz;
-    if (audio_frame->sample_rate_hz_ >= min_processing_rate_hz) {
-      break;
-    }
-  }
-  audio_frame->num_channels_ = std::min(input_num_channels, send_num_channels);
+void WebRtcVoiceFileStream::SetGain(float gain) {
+  output_gain = gain;
 }
 
 AudioMixer::Source::AudioFrameInfo WebRtcVoiceFileStream::GetAudioFrameWithInfo(
@@ -111,10 +85,6 @@ AudioMixer::Source::AudioFrameInfo WebRtcVoiceFileStream::GetAudioFrameWithInfo(
 
   audio_frame->num_channels_ = kRecordingNumChannels;
   audio_frame->sample_rate_hz_ = sample_rate_hz;
-
-  InitializeCaptureFrame(kRecordingFixedSampleRate, sample_rate_hz,
-                         kRecordingNumChannels, audio_frame->num_channels_,
-                         audio_frame);
 
   voe::RemixAndResample(_recordingBuffer, _recordingFramesIn10MS,
                         kRecordingNumChannels, kRecordingFixedSampleRate,
@@ -133,27 +103,6 @@ int WebRtcVoiceFileStream::Ssrc() const {
 int WebRtcVoiceFileStream::PreferredSampleRate() const {
   return kRecordingFixedSampleRate;
 }
-
-int WebRtcVoiceFileStream::id() const {
-  return 0;
-}
-
-absl::optional<Syncable::Info> WebRtcVoiceFileStream::GetInfo() const {
-  return absl::nullopt;
-}
-
-uint32_t WebRtcVoiceFileStream::GetPlayoutTimestamp() const {
-  // Called on video capture thread.
-  return 0;
-}
-
-void WebRtcVoiceFileStream::SetMinimumPlayoutDelay(int delay_ms) {
-  //   return channel_proxy_->SetMinimumPlayoutDelay(delay_ms);
-}
-
-void WebRtcVoiceFileStream::AssociateSendStream(AudioSendStream* send_stream) {}
-
-void WebRtcVoiceFileStream::SignalNetworkState(NetworkState state) {}
 
 internal::AudioState* WebRtcVoiceFileStream::audio_state() const {
   auto* audio_state = static_cast<internal::AudioState*>(audio_state_.get());

@@ -263,6 +263,7 @@ void WebRtcVoiceEngine::Init() {
     } else {
       config.audio_mixer = webrtc::AudioMixerImpl::Create();
     }
+    config.record_audio_mixer = webrtc::AudioMixerImpl::Create();
     config.audio_processing = apm_;
     config.audio_device_module = adm_;
     audio_state_ = webrtc::AudioState::Create(config);

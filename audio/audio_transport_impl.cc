@@ -17,6 +17,7 @@
 #include "audio/remix_resample.h"
 #include "audio/utility/audio_frame_operations.h"
 #include "call/audio_send_stream.h"
+#include "modules/audio_mixer/audio_mixer_impl.h"
 #include "rtc_base/logging.h"
 
 namespace webrtc {
@@ -81,11 +82,73 @@ int Resample(const AudioFrame& frame,
 }
 }  // namespace
 
+class InternalAudioSource : public AudioMixer::Source {
+ public:
+  InternalAudioSource() : _sample_rate(0){};
+  AudioFrameInfo GetAudioFrameWithInfo(int sample_rate_hz,
+                                       AudioFrame* audio_frame) override {
+    //no useable
+    InitializeCaptureFrame(_sample_rate, sample_rate_hz, _number_of_channels,
+                           _send_num_channels, audio_frame);
+
+    audio_frame->sample_rate_hz_ = sample_rate_hz;
+    audio_frame->num_channels_ =
+        std::min(_number_of_channels, _send_num_channels);
+
+    voe::RemixAndResample(_audio_data, _number_of_frames, _number_of_channels,
+                          _sample_rate, &capture_resampler_, audio_frame);
+
+    return AudioFrameInfo::kNormal;
+  }
+
+  // A way for a mixer implementation to distinguish participants.
+  int Ssrc() const override { return 0; }
+
+  // A way for this source to say that GetAudioFrameWithInfo called
+  // with this sample rate or higher will not cause quality loss.
+  int PreferredSampleRate() const override { return _sample_rate; }
+
+  ~InternalAudioSource() override {}
+
+  void SetFrame(const void* audio_data,
+                const size_t number_of_frames,
+                const size_t bytes_per_sample,
+                const size_t number_of_channels,
+                const uint32_t sample_rate) {
+    _audio_data = static_cast<const int16_t*>(audio_data),
+    _number_of_frames = number_of_frames;
+    _bytes_per_sample = bytes_per_sample;
+    _number_of_channels = number_of_channels;
+    _sample_rate = sample_rate;
+  };
+
+  void SetSendParam(int send_sample_rate_hz, size_t send_num_channels) {
+    _send_sample_rate_hz = send_sample_rate_hz;
+    _send_num_channels = send_num_channels;
+  }
+
+ private:
+  const int16_t* _audio_data = NULL;
+  size_t _number_of_frames = 0;
+  size_t _bytes_per_sample = 0;
+  size_t _number_of_channels = 0;
+  uint32_t _sample_rate = 0;
+
+  int _send_sample_rate_hz = 0;
+  size_t _send_num_channels = 0;
+  PushResampler<int16_t> capture_resampler_;
+};
+
 AudioTransportImpl::AudioTransportImpl(AudioMixer* mixer,
+                                       AudioMixer* record_mixer,
                                        AudioProcessing* audio_processing)
-    : audio_processing_(audio_processing), mixer_(mixer) {
+    : audio_processing_(audio_processing),
+      play_mixer_(mixer),
+      record_source_(new InternalAudioSource()),
+      record_mixer_(record_mixer) {
   RTC_DCHECK(mixer);
   RTC_DCHECK(audio_processing);
+  record_mixer_->AddSource(record_source_);
 }
 
 AudioTransportImpl::~AudioTransportImpl() {}
@@ -124,11 +187,24 @@ int32_t AudioTransportImpl::RecordedDataIsAvailable(
   }
 
   std::unique_ptr<AudioFrame> audio_frame(new AudioFrame());
-  InitializeCaptureFrame(sample_rate, send_sample_rate_hz, number_of_channels,
-                         send_num_channels, audio_frame.get());
-  voe::RemixAndResample(static_cast<const int16_t*>(audio_data),
-                        number_of_frames, number_of_channels, sample_rate,
-                        &capture_resampler_, audio_frame.get());
+
+  if (record_mixer_ && record_mixer_->SourceCnt() > 1) {
+    record_source_->SetSendParam(send_sample_rate_hz, send_num_channels);
+    record_source_->SetFrame(audio_data, number_of_frames, bytes_per_sample,
+                             number_of_channels, sample_rate);
+
+    record_mixer_->Mix(number_of_channels, &record_mixed_frame_);
+
+    audio_frame->CopyFrom(record_mixed_frame_);
+  } else {
+    InitializeCaptureFrame(sample_rate, send_sample_rate_hz, number_of_channels,
+                           send_num_channels, audio_frame.get());
+
+    voe::RemixAndResample(static_cast<const int16_t*>(audio_data),
+                          number_of_frames, number_of_channels, sample_rate,
+                          &capture_resampler_, audio_frame.get());
+  }
+
   ProcessCaptureFrame(audio_delay_milliseconds, key_pressed,
                       swap_stereo_channels, audio_processing_,
                       audio_frame.get());
@@ -192,19 +268,21 @@ int32_t AudioTransportImpl::NeedMorePlayData(const size_t nSamples,
   RTC_DCHECK_LE(nBytesPerSample * nSamples * nChannels,
                 AudioFrame::kMaxDataSizeBytes);
 
-  mixer_->Mix(nChannels, &mixed_frame_);
-  *elapsed_time_ms = mixed_frame_.elapsed_time_ms_;
-  *ntp_time_ms = mixed_frame_.ntp_time_ms_;
+  play_mixer_->Mix(nChannels, &play_mixed_frame_);
+  *elapsed_time_ms = play_mixed_frame_.elapsed_time_ms_;
+  *ntp_time_ms = play_mixed_frame_.ntp_time_ms_;
 
-  const auto error = audio_processing_->ProcessReverseStream(&mixed_frame_);
+  const auto error =
+      audio_processing_->ProcessReverseStream(&play_mixed_frame_);
   RTC_DCHECK_EQ(error, AudioProcessing::kNoError);
 
-  nSamplesOut = Resample(mixed_frame_, samplesPerSec, &render_resampler_,
+  nSamplesOut = Resample(play_mixed_frame_, samplesPerSec, &render_resampler_,
                          static_cast<int16_t*>(audioSamples));
   RTC_DCHECK_EQ(nSamplesOut, nChannels * nSamples);
   return 0;
 }
 
+#ifdef ChromiumWebrtc
 // Used by Chromium - same as NeedMorePlayData() but because Chrome has its
 // own APM instance, does not call audio_processing_->ProcessReverseStream().
 void AudioTransportImpl::PullRenderData(int bits_per_sample,
@@ -225,14 +303,16 @@ void AudioTransportImpl::PullRenderData(int bits_per_sample,
   // 8 = bits per byte.
   RTC_DCHECK_LE(bits_per_sample / 8 * number_of_frames * number_of_channels,
                 AudioFrame::kMaxDataSizeBytes);
-  mixer_->Mix(number_of_channels, &mixed_frame_);
-  *elapsed_time_ms = mixed_frame_.elapsed_time_ms_;
-  *ntp_time_ms = mixed_frame_.ntp_time_ms_;
+  play_mixer_->Mix(number_of_channels, &play_mixed_frame_);
+  *elapsed_time_ms = play_mixed_frame_.elapsed_time_ms_;
+  *ntp_time_ms = play_mixed_frame_.ntp_time_ms_;
 
-  auto output_samples = Resample(mixed_frame_, sample_rate, &render_resampler_,
-                                 static_cast<int16_t*>(audio_data));
+  auto output_samples =
+      Resample(play_mixed_frame_, sample_rate, &render_resampler_,
+               static_cast<int16_t*>(audio_data));
   RTC_DCHECK_EQ(output_samples, number_of_channels * number_of_frames);
 }
+#endif  // ChromiumWebrtc
 
 void AudioTransportImpl::UpdateSendingStreams(
     std::vector<AudioSendStream*> streams,

@@ -16,11 +16,11 @@
 #include <memory>
 #include <string>
 
+#include "common_audio/resampler/include/push_resampler.h"
 #include "modules/audio_device/audio_device_generic.h"
 #include "rtc_base/criticalsection.h"
 #include "rtc_base/system/file_wrapper.h"
 #include "rtc_base/timeutils.h"
-#include "common_audio/resampler/include/push_resampler.h"
 
 namespace rtc {
 class PlatformThread;
@@ -144,7 +144,6 @@ class FileAudioDevice : public AudioDeviceGeneric {
   int16_t* _recordingBuffer48000 = NULL;  // In bytes.
   size_t _recordingBufferSizeIn10MS48000;
   size_t _recordingFramesIn10MS48000;
-
 
   // TODO(pbos): Make plain members instead of pointers and stop resetting them.
   std::unique_ptr<rtc::PlatformThread> _ptrThreadRec;

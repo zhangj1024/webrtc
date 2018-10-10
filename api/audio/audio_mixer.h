@@ -70,6 +70,8 @@ class AudioMixer : public rtc::RefCountInterface {
   virtual void Mix(size_t number_of_channels,
                    AudioFrame* audio_frame_for_mixing) = 0;
 
+  // Get Source count
+  virtual int SourceCnt() = 0;
  protected:
   // Since the mixer is reference counted, the destructor may be
   // called from any thread.

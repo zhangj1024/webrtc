@@ -14,6 +14,7 @@
 #include "modules/audio_device/include/audio_device_defines.h"
 #include "rtc_base/refcount.h"
 #include "rtc_base/scoped_ref_ptr.h"
+#include "modules/audio_device/include/audio_device_tick.h"
 
 namespace webrtc {
 
@@ -159,6 +160,8 @@ class AudioDeviceModule : public rtc::RefCountInterface {
   virtual int GetPlayoutAudioParameters(AudioParameters* params) const = 0;
   virtual int GetRecordAudioParameters(AudioParameters* params) const = 0;
 #endif  // WEBRTC_IOS
+
+  virtual void RegisterTickCallback(AudioTick* tick) {};
 
  protected:
   ~AudioDeviceModule() override {}

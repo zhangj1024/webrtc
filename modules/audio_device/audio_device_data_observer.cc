@@ -92,6 +92,7 @@ class ADMWrapper : public AudioDeviceModule, public AudioTransport {
     return res;
   }
 
+#ifdef ChromiumWebrtc
   void PullRenderData(int bits_per_sample,
                       int sample_rate,
                       size_t number_of_channels,
@@ -101,6 +102,7 @@ class ADMWrapper : public AudioDeviceModule, public AudioTransport {
                       int64_t* ntp_time_ms) override {
     RTC_NOTREACHED();
   }
+#endif //ChromiumWebrtc
 
   // Override AudioDeviceModule's RegisterAudioCallback method to remember the
   // actual audio transport (e.g.: voice engine).

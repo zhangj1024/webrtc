@@ -54,6 +54,7 @@ class AudioTransport {
                                    int64_t* elapsed_time_ms,
                                    int64_t* ntp_time_ms) = 0;  // NOLINT
 
+#ifdef ChromiumWebrtc
   // Method to pull mixed render audio data from all active VoE channels.
   // The data will not be passed as reference for audio processing internally.
   virtual void PullRenderData(int bits_per_sample,
@@ -63,6 +64,7 @@ class AudioTransport {
                               void* audio_data,
                               int64_t* elapsed_time_ms,
                               int64_t* ntp_time_ms) = 0;
+#endif //ChromiumWebrtc
 
  protected:
   virtual ~AudioTransport() {}

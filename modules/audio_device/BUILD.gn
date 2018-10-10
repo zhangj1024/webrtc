@@ -233,6 +233,7 @@ rtc_source_set("audio_device_impl") {
     "include/fake_audio_device.h",
     "include/test_audio_device.cc",
     "include/test_audio_device.h",
+    "include/audio_device_tick.h",
   ]
 
   if (build_with_mozilla) {
