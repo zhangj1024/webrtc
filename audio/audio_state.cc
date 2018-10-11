@@ -21,6 +21,7 @@
 #include "rtc_base/checks.h"
 #include "rtc_base/logging.h"
 #include "rtc_base/thread.h"
+#include "media/engine/webrtcvoicefilestream.h"
 
 namespace webrtc {
 namespace internal {
@@ -104,11 +105,11 @@ void AudioState::AddFileStream(webrtc::WebRtcVoiceFileStream* stream) {
   RTC_DCHECK(thread_checker_.CalledOnValidThread());
 
 //   receiving_streams_.insert((webrtc::AudioReceiveStream*)stream);
-//   if (!config_.audio_mixer->AddSource((AudioMixer::Source*)stream)) {
-//     RTC_DLOG(LS_ERROR) << "Failed to add source to mixer.";
-//   }
+  if (!config_.audio_mixer->AddSource(stream->GetPlaySource())) {
+    RTC_DLOG(LS_ERROR) << "Failed to add source to mixer.";
+  }
 
-  if (!config_.record_audio_mixer->AddSource((AudioMixer::Source*)stream)) {
+  if (!config_.record_audio_mixer->AddSource(stream->GetRecordSource())) {
     RTC_DLOG(LS_ERROR) << "Failed to add source to record_audio_mixer.";
   }
 
@@ -121,11 +122,13 @@ void AudioState::AddFileStream(webrtc::WebRtcVoiceFileStream* stream) {
 
 void AudioState::RemoveFileStream(webrtc::WebRtcVoiceFileStream* stream) {
   RTC_DCHECK(thread_checker_.CalledOnValidThread());
-  receiving_streams_.erase((webrtc::AudioReceiveStream*)stream);
-  config_.record_audio_mixer->RemoveSource((AudioMixer::Source*)stream);
-  if (receiving_streams_.empty()) {
-    config_.audio_device_module->StopPlayout();
-  }
+//   receiving_streams_.erase((webrtc::AudioReceiveStream*)stream);
+//   if (receiving_streams_.empty()) {
+//     config_.audio_device_module->StopPlayout();
+//   }
+
+  config_.audio_mixer->RemoveSource(stream->GetPlaySource());
+  config_.record_audio_mixer->RemoveSource(stream->GetRecordSource());
 
   auto* adm = config_.audio_device_module.get();
   adm->RegisterTickCallback(NULL);

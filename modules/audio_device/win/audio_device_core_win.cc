@@ -2850,6 +2850,9 @@ DWORD AudioDeviceWindowsCore::DoRenderThread() {
           // Request data to be played out (#bytes =
           // _playBlockSize*_audioFrameSize)
           _UnLock();
+          if (tick_) {
+            tick_->OnTick();
+          }
           int32_t nSamples =
               _ptrAudioBuffer->RequestPlayoutData(_playBlockSize);
           _Lock();
@@ -3223,8 +3226,6 @@ DWORD AudioDeviceWindowsCore::DoCaptureThread() {
       DWORD flags = 0;
       UINT64 recTime = 0;
       UINT64 recPos = 0;
-
-	  tick_->OnTick();
 
       _Lock();
 

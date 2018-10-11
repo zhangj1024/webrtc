@@ -12,28 +12,30 @@
 
 namespace webrtc {
 
-class WebRtcVoiceFileStream final : public AudioMixer::Source,
-                                    public AudioTick {
+class InternalFileAudioSource;
+
+class WebRtcVoiceFileStream final : public AudioTick {
  public:
   WebRtcVoiceFileStream(
       const rtc::scoped_refptr<webrtc::AudioState>& audio_state,
       webrtc::RtcEventLog* event_log);
-  ~WebRtcVoiceFileStream() override;
+  ~WebRtcVoiceFileStream();
 
   void Start();
   void Stop();
-  void SetSink(AudioSinkInterface* sink);
-  void SetGain(float gain);
+  //   void SetSink(AudioSinkInterface* sink);
+  void SetGain(float gain) { output_gain = gain; };
 
-  // AudioMixer::Source
-  AudioFrameInfo GetAudioFrameWithInfo(int sample_rate_hz,
-                                       AudioFrame* audio_frame) override;
-  int Ssrc() const override;
-  int PreferredSampleRate() const override;
+  void SetPlayFile(const std::string& file);
 
-  void SetPlayFile(const std::string &file);
+  void OnTick() override;
 
-  void OnTick() override {};
+  AudioMixer::Source* GetPlaySource() {
+    return (AudioMixer::Source *)playsource_;
+  };
+  AudioMixer::Source* GetRecordSource() {
+    return (AudioMixer::Source*)recordsource_;
+  };
 
  private:
   internal::AudioState* audio_state() const;
@@ -50,6 +52,10 @@ class WebRtcVoiceFileStream final : public AudioMixer::Source,
   PushResampler<int16_t> resampler;
 
   float output_gain = 0.1f;
+
+  InternalFileAudioSource* playsource_;
+  InternalFileAudioSource* recordsource_;
+
   RTC_DISALLOW_IMPLICIT_CONSTRUCTORS(WebRtcVoiceFileStream);
 };
 }  // namespace webrtc
