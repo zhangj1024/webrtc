@@ -432,8 +432,7 @@ AudioDeviceWindowsCore::AudioDeviceWindowsCore()
       _inputDevice(AudioDeviceModule::kDefaultCommunicationDevice),
       _outputDevice(AudioDeviceModule::kDefaultCommunicationDevice),
       _inputDeviceIndex(0),
-      _outputDeviceIndex(0),
-      tick_(NULL) {
+      _outputDeviceIndex(0) {
   RTC_LOG(LS_INFO) << __FUNCTION__ << " created";
   assert(_comInit.succeeded());
 
@@ -2850,9 +2849,6 @@ DWORD AudioDeviceWindowsCore::DoRenderThread() {
           // Request data to be played out (#bytes =
           // _playBlockSize*_audioFrameSize)
           _UnLock();
-          if (tick_) {
-            tick_->OnTick();
-          }
           int32_t nSamples =
               _ptrAudioBuffer->RequestPlayoutData(_playBlockSize);
           _Lock();

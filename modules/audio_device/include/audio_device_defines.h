@@ -17,6 +17,7 @@
 #include "rtc_base/checks.h"
 #include "rtc_base/deprecation.h"
 #include "rtc_base/strings/string_builder.h"
+#include "modules/audio_device/include/audio_device_tick.h"
 
 namespace webrtc {
 
@@ -65,6 +66,8 @@ class AudioTransport {
                               int64_t* elapsed_time_ms,
                               int64_t* ntp_time_ms) = 0;
 #endif //ChromiumWebrtc
+
+  virtual void RegisterTickCallback(AudioTick* tick) {};
 
  protected:
   virtual ~AudioTransport() {}

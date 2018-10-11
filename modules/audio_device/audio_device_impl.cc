@@ -938,8 +938,4 @@ AudioDeviceModule::AudioLayer AudioDeviceModuleImpl::PlatformAudioLayer()
   return audio_layer_;
 }
 
-void AudioDeviceModuleImpl::RegisterTickCallback(AudioTick* tick) {
-  audio_device_->RegisterTickCallback(tick);
-}
-
 }  // namespace webrtc

@@ -131,8 +131,6 @@ class AudioDeviceGeneric {
 
   virtual void AttachAudioBuffer(AudioDeviceBuffer* audioBuffer) = 0;
 
-  virtual void RegisterTickCallback(AudioTick* tick) {};
-
   virtual ~AudioDeviceGeneric() {}
 };
 

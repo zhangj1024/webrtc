@@ -116,8 +116,7 @@ void AudioState::AddFileStream(webrtc::WebRtcVoiceFileStream* stream) {
   InitPlayout();
   InitRecording();
 
-  auto* adm = config_.audio_device_module.get();
-  adm->RegisterTickCallback((AudioTick *)stream);
+  this->audio_transport_.RegisterTickCallback((AudioTick*)stream);
 }
 
 void AudioState::RemoveFileStream(webrtc::WebRtcVoiceFileStream* stream) {
@@ -130,8 +129,7 @@ void AudioState::RemoveFileStream(webrtc::WebRtcVoiceFileStream* stream) {
   config_.audio_mixer->RemoveSource(stream->GetPlaySource());
   config_.record_audio_mixer->RemoveSource(stream->GetRecordSource());
 
-  auto* adm = config_.audio_device_module.get();
-  adm->RegisterTickCallback(NULL);
+  this->audio_transport_.RegisterTickCallback(NULL);
 }
 
 void AudioState::SetPlayout(bool enabled) {

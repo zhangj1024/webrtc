@@ -145,7 +145,8 @@ AudioTransportImpl::AudioTransportImpl(AudioMixer* mixer,
     : audio_processing_(audio_processing),
       play_mixer_(mixer),
       record_source_(new InternalAudioSource()),
-      record_mixer_(record_mixer) {
+      record_mixer_(record_mixer),
+      tick_ (NULL){
   RTC_DCHECK(mixer);
   RTC_DCHECK(audio_processing);
   record_mixer_->AddSource(record_source_);
@@ -184,6 +185,10 @@ int32_t AudioTransportImpl::RecordedDataIsAvailable(
     send_sample_rate_hz = send_sample_rate_hz_;
     send_num_channels = send_num_channels_;
     swap_stereo_channels = swap_stereo_channels_;
+  }
+
+  if (tick_) {
+    tick_->OnBeforeRecordData();
   }
 
   std::unique_ptr<AudioFrame> audio_frame(new AudioFrame());
@@ -268,6 +273,10 @@ int32_t AudioTransportImpl::NeedMorePlayData(const size_t nSamples,
   RTC_DCHECK_LE(nBytesPerSample * nSamples * nChannels,
                 AudioFrame::kMaxDataSizeBytes);
 
+  if (tick_) {
+    tick_->OnBeforePlayData();
+  }
+
   play_mixer_->Mix(nChannels, &play_mixed_frame_);
   *elapsed_time_ms = play_mixed_frame_.elapsed_time_ms_;
   *ntp_time_ms = play_mixed_frame_.ntp_time_ms_;
@@ -313,6 +322,10 @@ void AudioTransportImpl::PullRenderData(int bits_per_sample,
   RTC_DCHECK_EQ(output_samples, number_of_channels * number_of_frames);
 }
 #endif  // ChromiumWebrtc
+
+void AudioTransportImpl::RegisterTickCallback(AudioTick* tick) {
+  tick_ = tick;
+}
 
 void AudioTransportImpl::UpdateSendingStreams(
     std::vector<AudioSendStream*> streams,

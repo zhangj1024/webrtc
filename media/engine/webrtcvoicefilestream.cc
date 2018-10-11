@@ -13,6 +13,7 @@
 #include "audio/remix_resample.h"
 #include "audio/utility/audio_frame_operations.h"
 #include "rtc_base/thread_checker.h"
+#include "system_wrappers/include/sleep.h"
 
 const int kRecordingFixedSampleRate = 44100;
 const size_t kRecordingNumChannels = 1;
@@ -26,12 +27,9 @@ namespace webrtc {
 
 class InternalFileAudioSource : public AudioMixer::Source {
  public:
-  InternalFileAudioSource() {};
+  InternalFileAudioSource(){};
   AudioFrameInfo GetAudioFrameWithInfo(int sample_rate_hz,
                                        AudioFrame* audio_frame) override {
-
-// 	RTC_LOG(LS_ERROR) << <<  __FUNCTION__ << rtc::TimeMillis();
-
     if (!audio_data_) {
       return AudioFrameInfo::kError;
     }
@@ -39,7 +37,7 @@ class InternalFileAudioSource : public AudioMixer::Source {
       return AudioFrameInfo::kMuted;
     }
 
-	audio_frame->num_channels_ = audio_data_->num_channels_;
+    audio_frame->num_channels_ = audio_data_->num_channels_;
     audio_frame->sample_rate_hz_ = sample_rate_hz;
 
     voe::RemixAndResample(*audio_data_.get(), &capture_resampler_, audio_frame);
@@ -74,7 +72,9 @@ WebRtcVoiceFileStream::WebRtcVoiceFileStream(
     : audio_state_(audio_state),
       _inputFile(*FileWrapper::Create()),
       playsource_(new InternalFileAudioSource()),
-      recordsource_(new InternalFileAudioSource()) {}
+      recordsource_(new InternalFileAudioSource()) {
+  _hShutdownRenderEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
+}
 
 WebRtcVoiceFileStream::~WebRtcVoiceFileStream() {
   Stop();
@@ -88,6 +88,10 @@ void WebRtcVoiceFileStream::Start() {
     return;
   }
 
+  if (_hPlayThread != NULL) {
+    return;
+  }
+
   if (!_inputFilename.empty() &&
       !_inputFile.OpenFile(_inputFilename.c_str(), true)) {
     RTC_LOG(LS_ERROR) << "Failed to open audio input file: " << _inputFilename;
@@ -98,22 +102,81 @@ void WebRtcVoiceFileStream::Start() {
     _recordingBuffer = new int16_t[kRecordingBufferSizeIn10Ms];
   }
 
+  {
+    rtc::CritScope critScoped(&_critSect);
+    audio_frame_list_player_.clear();
+    audio_frame_list_record_.clear();
+
+    // Create thread which will drive the rendering.
+    assert(_hPlayThread == NULL);
+    _hPlayThread = CreateThread(NULL, 0, FileThreadFunc, this, 0, NULL);
+    if (_hPlayThread == NULL) {
+      RTC_LOG(LS_ERROR) << "failed to create the playout thread";
+      return;
+    }
+
+    // Set thread priority to highest possible.
+    SetThreadPriority(_hPlayThread, THREAD_PRIORITY_TIME_CRITICAL);
+  }  // critScoped
+
   playing_ = true;
   playsource_->SetSampleRate(kRecordingFixedSampleRate);
   recordsource_->SetSampleRate(kRecordingFixedSampleRate);
-  audio_state()->AddFileStream(this);
 
-  //get mic and player 
+  RTC_LOG(LS_INFO) << "Started recording from input file: " << _inputFilename;
+
+  audio_state()->AddFileStream(this);
 }
 
 void WebRtcVoiceFileStream::Stop() {
   if (!playing_) {
     return;
   }
-  playing_ = false;
-  audio_state()->RemoveFileStream(this);
 
-  _inputFile.CloseFile();
+  {
+    rtc::CritScope critScoped(&_critSect);
+    _inputFile.CloseFile();
+    audio_state()->RemoveFileStream(this);
+
+    if (_hPlayThread == NULL) {
+      RTC_LOG(LS_VERBOSE)
+          << "no rendering stream is active => close down WASAPI only";
+      playing_ = false;
+      return;
+    }
+
+    // stop the driving thread...
+    RTC_LOG(LS_VERBOSE)
+        << "closing down the webrtc_core_audio_render_thread...";
+    SetEvent(_hShutdownRenderEvent);
+  }  // critScoped
+
+  DWORD ret = WaitForSingleObject(_hPlayThread, 2000);
+  if (ret != WAIT_OBJECT_0) {
+    // the thread did not stop as it should
+    RTC_LOG(LS_ERROR) << "failed to close down webrtc_core_audio_render_thread";
+    CloseHandle(_hPlayThread);
+    _hPlayThread = NULL;
+    playing_ = false;
+    return;
+  }
+
+  {
+    rtc::CritScope critScoped(&_critSect);
+    RTC_LOG(LS_VERBOSE) << "webrtc_core_audio_render_thread is now closed";
+
+    // to reset this event manually at each time we finish with it,
+    // in case that the render thread has exited before StopPlayout(),
+    // this event might be caught by the new render thread within same VoE
+    // instance.
+    ResetEvent(_hShutdownRenderEvent);
+
+    CloseHandle(_hPlayThread);
+    _hPlayThread = NULL;
+    audio_frame_list_player_.clear();
+    audio_frame_list_record_.clear();
+    playing_ = false;
+  }
 }
 
 internal::AudioState* WebRtcVoiceFileStream::audio_state() const {
@@ -126,35 +189,102 @@ void WebRtcVoiceFileStream::SetPlayFile(const std::string& file) {
   _inputFilename = file;
 }
 
-void WebRtcVoiceFileStream::OnTick() {
+void WebRtcVoiceFileStream::OnBeforePlayData() {
   rtc::CritScope lock(&crit_sect_);
   if (!playing_) {
     return;
   }
 
-  // get file data
-  if (_inputFile.Read(_recordingBuffer,
-                      kRecordingBufferSizeIn10Ms * sizeof(int16_t)) > 0) {
-  } else {
-    _inputFile.Rewind();
+  if (audio_frame_list_player_.size() == 0) {
     return;
   }
 
-  std::unique_ptr<AudioFrame> audio_frame(new AudioFrame());
+  AudioFrame* audio_frame = audio_frame_list_player_.front();
+  audio_frame_list_player_.pop_front();
 
-  audio_frame->UpdateFrame(0, _recordingBuffer, kRecordingFramesIn10MS,
-                           kRecordingFixedSampleRate,
-                           AudioFrame::kUndefined,
-                           AudioFrame::kVadUnknown, kRecordingNumChannels);
-  
-  //音量设置
-  AudioFrameOperations::ScaleWithSat(output_gain, audio_frame.get());
+  AudioFrame* audio_frame_record = new AudioFrame();
+  audio_frame_record->CopyFrom(*audio_frame);
+  audio_frame_list_record_.push_back(audio_frame_record);
 
-  std::unique_ptr<AudioFrame> audio_frame_copy(new AudioFrame());
-  audio_frame_copy->CopyFrom(*audio_frame.get());
-
-  playsource_->SetFrame(std::move(audio_frame_copy));
-  recordsource_->SetFrame(std::move(audio_frame));
+  std::unique_ptr<AudioFrame> audio_frame_player(audio_frame);
+  playsource_->SetFrame(std::move(audio_frame_player));
 };
+
+void WebRtcVoiceFileStream::OnBeforeRecordData() {
+  rtc::CritScope lock(&crit_sect_);
+  if (!playing_) {
+    return;
+  }
+
+  if (audio_frame_list_record_.size() == 0) {
+    return;
+  }
+
+  AudioFrame* audio_frame = audio_frame_list_record_.front();
+  audio_frame_list_record_.pop_front();
+
+  std::unique_ptr<AudioFrame> audio_frame_record(audio_frame);
+  recordsource_->SetFrame(std::move(audio_frame_record));
+}
+
+DWORD WINAPI WebRtcVoiceFileStream::FileThreadFunc(LPVOID context) {
+  return reinterpret_cast<WebRtcVoiceFileStream*>(context)->FileThreadProcess();
+}
+
+bool WebRtcVoiceFileStream::FileThreadProcess() {
+  bool keepPlaying = true;
+
+  while (keepPlaying) {
+    // Wait for a render notification event or a shutdown event
+    DWORD waitResult = WaitForSingleObject(_hShutdownRenderEvent, 5);
+    switch (waitResult) {
+      case WAIT_OBJECT_0:  // _hShutdownCaptureEvent
+        keepPlaying = false;
+        break;
+      case WAIT_TIMEOUT:  // timeout notification
+        break;
+      default:  // unexpected error
+        RTC_LOG(LS_WARNING) << "Unknown wait termination on capture side";
+        keepPlaying = false;
+        break;
+    }
+
+    if (!playing_ || !_inputFile.is_open()) {
+      return false;
+    }
+
+    if (audio_frame_list_player_.size() >= 5) {
+      continue;
+    }
+
+    rtc::CritScope lock(&crit_sect_);
+
+    if (_inputFile.Read(_recordingBuffer,
+                        kRecordingBufferSizeIn10Ms * sizeof(int16_t)) > 0) {
+      AudioFrame* audio_frame = new AudioFrame();
+
+      audio_frame->UpdateFrame(0, _recordingBuffer, kRecordingFramesIn10MS,
+                               kRecordingFixedSampleRate,
+                               AudioFrame::kUndefined, AudioFrame::kVadUnknown,
+                               kRecordingNumChannels);
+
+      //音量设置
+      AudioFrameOperations::ScaleWithSat(output_gain, audio_frame);
+
+      audio_frame_list_player_.push_back(audio_frame);
+      //       audio_frame->num_channels_ = kRecordingNumChannels;
+      //       audio_frame->sample_rate_hz_ = kRecordingFixedSampleRate48000;
+      //
+      //       voe::RemixAndResample(_recordingBuffer, _recordingFramesIn10MS,
+      //                             kRecordingNumChannels,
+      //                             kRecordingFixedSampleRate, &resampler,
+      //                             audio_frame.get());
+    } else {
+      _inputFile.Rewind();
+    }
+  }
+
+  return true;
+}
 
 }  // namespace webrtc

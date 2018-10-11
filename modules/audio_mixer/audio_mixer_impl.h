@@ -60,12 +60,15 @@ class AudioMixerImpl : public AudioMixer {
            AudioFrame* audio_frame_for_mixing) override
       RTC_LOCKS_EXCLUDED(crit_);
 
-  int SourceCnt() override;
-
   // Returns true if the source was mixed last round. Returns
   // false and logs an error if the source was never added to the
   // mixer.
   bool GetAudioSourceMixabilityStatusForTest(Source* audio_source) const;
+
+  int SourceCnt() override;
+
+    // Get mixing frequency. public for WebRtcVoiceFileStream
+  int OutputFrequency() const override;
 
  protected:
   AudioMixerImpl(std::unique_ptr<OutputRateCalculator> output_rate_calculator,
@@ -74,8 +77,6 @@ class AudioMixerImpl : public AudioMixer {
  private:
   // Set mixing frequency through OutputFrequencyCalculator.
   void CalculateOutputFrequency();
-  // Get mixing frequency.
-  int OutputFrequency() const;
 
   // Compute what audio sources to mix from audio_source_list_. Ramp
   // in and out. Update mixed status. Mixes up to

@@ -66,6 +66,8 @@ class AudioTransportImpl : public AudioTransport {
                       int64_t* ntp_time_ms) override;
 #endif  // ChromiumWebrtc
 
+  void RegisterTickCallback(AudioTick* tick) override;
+
   void UpdateSendingStreams(std::vector<AudioSendStream*> streams,
                             int send_sample_rate_hz,
                             size_t send_num_channels);
@@ -97,6 +99,8 @@ class AudioTransportImpl : public AudioTransport {
   InternalAudioSource* record_source_;
   rtc::scoped_refptr<AudioMixer> record_mixer_;
   AudioFrame record_mixed_frame_;
+
+  AudioTick* tick_;
 
   RTC_DISALLOW_IMPLICIT_CONSTRUCTORS(AudioTransportImpl);
 };

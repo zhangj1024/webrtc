@@ -7,6 +7,7 @@
 #include "call/call.h"
 #include "call/syncable.h"
 #include "common_audio/resampler/include/push_resampler.h"
+#include "rtc_base/platform_thread.h"
 #include "rtc_base/system/file_wrapper.h"
 #include "rtc_base/thread_checker.h"
 
@@ -28,16 +29,27 @@ class WebRtcVoiceFileStream final : public AudioTick {
 
   void SetPlayFile(const std::string& file);
 
-  void OnTick() override;
+  // AudioTick imp
+  void OnBeforePlayData() override;
+  void OnBeforeRecordData() override;
 
   AudioMixer::Source* GetPlaySource() {
-    return (AudioMixer::Source *)playsource_;
+    return (AudioMixer::Source*)playsource_;
   };
   AudioMixer::Source* GetRecordSource() {
     return (AudioMixer::Source*)recordsource_;
   };
 
  private:
+  static DWORD WINAPI FileThreadFunc(LPVOID context);
+  bool FileThreadProcess();
+  rtc::CriticalSection _critSect;
+  std::list<AudioFrame*> audio_frame_list_player_;
+  std::list<AudioFrame*> audio_frame_list_record_;
+
+  HANDLE _hPlayThread = NULL;
+  HANDLE _hShutdownRenderEvent = NULL;
+
   internal::AudioState* audio_state() const;
   rtc::scoped_refptr<webrtc::AudioState> audio_state_;
 

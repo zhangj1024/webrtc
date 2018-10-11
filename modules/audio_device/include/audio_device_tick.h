@@ -18,8 +18,8 @@
 namespace webrtc {
 class AudioTick {
  public:
-  virtual void OnTick() {};
-
+  virtual void OnBeforeRecordData() = 0;
+  virtual void OnBeforePlayData() = 0;
  protected:
  private:
 };
