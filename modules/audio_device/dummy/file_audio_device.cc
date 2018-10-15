@@ -403,16 +403,18 @@ bool FileAudioDevice::RecThreadProcess() {
       _ptrAudioBuffer->SetRecordedBuffer(_recordingBuffer48000,
                                          out_length / kRecordingNumChannels);
 #else
-      std::unique_ptr<AudioFrame> audio_frame(new AudioFrame());
-      audio_frame->num_channels_ = kRecordingNumChannels;
-      audio_frame->sample_rate_hz_ = kRecordingFixedSampleRate48000;
-
-      voe::RemixAndResample(_recordingBuffer, _recordingFramesIn10MS,
-                            kRecordingNumChannels, kRecordingFixedSampleRate,
-                            &resampler, audio_frame.get());
-
-      _ptrAudioBuffer->SetRecordedBuffer(audio_frame->mutable_data(),
-                                         audio_frame->samples_per_channel_);
+//       std::unique_ptr<AudioFrame> audio_frame(new AudioFrame());
+//       audio_frame->num_channels_ = kRecordingNumChannels;
+//       audio_frame->sample_rate_hz_ = kRecordingFixedSampleRate48000;
+// 
+//       voe::RemixAndResample(_recordingBuffer, _recordingFramesIn10MS,
+//                             kRecordingNumChannels, kRecordingFixedSampleRate,
+//                             &resampler, audio_frame.get());
+// 
+//       _ptrAudioBuffer->SetRecordedBuffer(audio_frame->mutable_data(),
+//                                          audio_frame->samples_per_channel_);
+      _ptrAudioBuffer->SetRecordedBuffer(_recordingBuffer,
+                                         _recordingFramesIn10MS);
 #endif
     } else {
       _inputFile.Rewind();

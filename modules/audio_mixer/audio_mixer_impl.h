@@ -67,9 +67,6 @@ class AudioMixerImpl : public AudioMixer {
 
   int SourceCnt() override;
 
-    // Get mixing frequency. public for WebRtcVoiceFileStream
-  int OutputFrequency() const override;
-
  protected:
   AudioMixerImpl(std::unique_ptr<OutputRateCalculator> output_rate_calculator,
                  bool use_limiter);
@@ -77,6 +74,8 @@ class AudioMixerImpl : public AudioMixer {
  private:
   // Set mixing frequency through OutputFrequencyCalculator.
   void CalculateOutputFrequency();
+  // Get mixing frequency.
+  int OutputFrequency() const;
 
   // Compute what audio sources to mix from audio_source_list_. Ramp
   // in and out. Update mixed status. Mixes up to

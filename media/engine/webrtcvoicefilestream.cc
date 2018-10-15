@@ -268,17 +268,24 @@ bool WebRtcVoiceFileStream::FileThreadProcess() {
                                AudioFrame::kUndefined, AudioFrame::kVadUnknown,
                                kRecordingNumChannels);
 
+#if 0
+      int sample_rate = audio_state()->GetPlaySampleRate();
+      if (sample_rate > 0 &&
+          sample_rate == audio_state()->GetRecordSampleRate()) {
+        AudioFrame* audio_frame_mix = new AudioFrame();
+        audio_frame_mix->sample_rate_hz_ = sample_rate;
+        audio_frame_mix->num_channels_ = audio_frame->num_channels_;
+
+        voe::RemixAndResample(*audio_frame, &resampler, audio_frame_mix);
+
+        delete audio_frame;
+        audio_frame = audio_frame_mix;
+      }
+#endif
       //ÒôÁ¿ÉèÖÃ
       AudioFrameOperations::ScaleWithSat(output_gain, audio_frame);
 
       audio_frame_list_player_.push_back(audio_frame);
-      //       audio_frame->num_channels_ = kRecordingNumChannels;
-      //       audio_frame->sample_rate_hz_ = kRecordingFixedSampleRate48000;
-      //
-      //       voe::RemixAndResample(_recordingBuffer, _recordingFramesIn10MS,
-      //                             kRecordingNumChannels,
-      //                             kRecordingFixedSampleRate, &resampler,
-      //                             audio_frame.get());
     } else {
       _inputFile.Rewind();
     }
