@@ -282,7 +282,7 @@ bool WebRtcVoiceFileStream::FileThreadProcess() {
         audio_frame = audio_frame_mix;
       }
 #endif
-      //ÒôÁ¿ÉèÖÃ
+      //éŸ³é‡è®¾ç½®
       AudioFrameOperations::ScaleWithSat(output_gain, audio_frame);
 
       audio_frame_list_player_.push_back(audio_frame);
