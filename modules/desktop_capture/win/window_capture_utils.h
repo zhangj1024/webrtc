@@ -9,6 +9,7 @@
  */
 
 #include <shlobj.h>
+#define _WINSOCKAPI_
 #include <windows.h>
 #include <wrl/client.h>
 

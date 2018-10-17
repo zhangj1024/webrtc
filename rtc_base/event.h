@@ -13,6 +13,7 @@
 
 #include "rtc_base/constructormagic.h"
 #if defined(WEBRTC_WIN)
+#define _WINSOCKAPI_
 #include <windows.h>
 #elif defined(WEBRTC_POSIX)
 #include <pthread.h>

@@ -19,6 +19,7 @@
 #if defined(WEBRTC_WIN)
 #include <malloc.h>
 #include <wchar.h>
+#define _WINSOCKAPI_
 #include <windows.h>
 #define alloca _alloca
 #endif  // WEBRTC_WIN

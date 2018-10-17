@@ -23,6 +23,7 @@
 // clang-format off
 // clang formating would change include order.
 #include <winsock2.h> // must come first
+#define _WINSOCKAPI_
 #include <windows.h>
 // clang-format on
 

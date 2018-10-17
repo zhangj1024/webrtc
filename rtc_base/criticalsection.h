@@ -24,6 +24,7 @@
 // win32.h. To include win32.h directly, it must be broken out into its own
 // build target.
 #include <winsock2.h>
+#define _WINSOCKAPI_
 #include <windows.h>
 #include <sal.h>  // must come after windows headers.
 // clang-format on
