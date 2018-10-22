@@ -1919,6 +1919,68 @@ bool WebRtcVoiceMediaChannel::AddFileStream(const std::string& file) {
   return true;
 }
 
+bool WebRtcVoiceMediaChannel::RemoveFileStream() {
+  if (fileStream == NULL) {
+    return false;
+  }
+
+  fileStream->Stop();
+
+  return true;
+}
+
+bool WebRtcVoiceMediaChannel::PauseFileStream(bool pause) {
+  if (fileStream == NULL) {
+    return false;
+  }
+
+  fileStream->SetPause(pause);
+
+  return true;
+}
+
+bool WebRtcVoiceMediaChannel::SetFileStreamVolume(float volume) {
+  if (fileStream == NULL) {
+    return false;
+  }
+
+  fileStream->SetGain(volume);
+
+  return true;
+}
+
+float WebRtcVoiceMediaChannel::GetFileStreamVolume() {
+  if (fileStream == NULL) {
+    return 0;
+  }
+
+  return fileStream->GetGain();
+}
+
+void WebRtcVoiceMediaChannel::SetPlayCallback(webrtc::PlayCallback* tick) {
+  if (fileStream == NULL) {
+    return;
+  }
+
+  fileStream->SetPlayCallback(tick);
+}
+
+bool WebRtcVoiceMediaChannel::SetPlayTime(int64_t time) {
+  if (fileStream == NULL) {
+    return false;
+  }
+
+  return fileStream->SetPlayTime(time);
+}
+
+int64_t WebRtcVoiceMediaChannel::GetPlayTotalTime() {
+  if (fileStream == NULL) {
+    return 0;
+  }
+
+  return fileStream->GetPlayTotalTime();
+}
+
 bool WebRtcVoiceMediaChannel::SetLocalSource(uint32_t ssrc,
                                              AudioSource* source) {
   auto it = send_streams_.find(ssrc);

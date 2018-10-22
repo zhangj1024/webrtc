@@ -7,9 +7,11 @@
 #include "call/call.h"
 #include "call/syncable.h"
 #include "common_audio/resampler/include/push_resampler.h"
+#include "rtc_base/asyncinvoker.h"
 #include "rtc_base/platform_thread.h"
 #include "rtc_base/system/file_wrapper.h"
 #include "rtc_base/thread_checker.h"
+#include "modules/audio_device/include/audio_file_playback.h"
 
 namespace webrtc {
 
@@ -26,6 +28,7 @@ class WebRtcVoiceFileStream final : public AudioTick {
   void Stop();
   //   void SetSink(AudioSinkInterface* sink);
   void SetGain(float gain) { output_gain = gain; };
+  float GetGain() { return output_gain; };
 
   void SetPlayFile(const std::string& file);
 
@@ -40,20 +43,30 @@ class WebRtcVoiceFileStream final : public AudioTick {
     return (AudioMixer::Source*)recordsource_;
   };
 
+  void SetPause(bool pause);
+
+  void SetPlayCallback(PlayCallback* tick) { tick_ = tick; };
+  bool SetPlayTime(int64_t time);
+  int64_t GetPlayTotalTime() { return totalTime_; };
+
  private:
   static DWORD WINAPI FileThreadFunc(LPVOID context);
   bool FileThreadProcess();
+  int64_t GetPlayTime();
+  void OnTimeTick();
+
   rtc::CriticalSection _critSect;
   std::list<AudioFrame*> audio_frame_list_player_;
   std::list<AudioFrame*> audio_frame_list_record_;
 
   HANDLE _hPlayThread = NULL;
   HANDLE _hShutdownRenderEvent = NULL;
+  HANDLE _hPauseEvent = NULL;
 
   internal::AudioState* audio_state() const;
   rtc::scoped_refptr<webrtc::AudioState> audio_state_;
 
-  bool playing_ = false;
+  volatile bool playing_ = false;
 
   std::string _inputFilename;
   FileWrapper& _inputFile;
@@ -63,10 +76,17 @@ class WebRtcVoiceFileStream final : public AudioTick {
 
   PushResampler<int16_t> resampler;
 
-  float output_gain = 0.1f;
+  volatile float output_gain = 0.1f;
 
   InternalFileAudioSource* playsource_;
   InternalFileAudioSource* recordsource_;
+
+  PlayCallback* tick_ = nullptr;
+  int64_t lastTime_ = 0;
+  int64_t totalTime_ = 0;
+
+  rtc::AsyncInvoker invoker_;
+  rtc::Thread* worker_thread_ = nullptr;
 
   RTC_DISALLOW_IMPLICIT_CONSTRUCTORS(WebRtcVoiceFileStream);
 };

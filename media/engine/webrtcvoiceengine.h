@@ -209,6 +209,14 @@ class WebRtcVoiceMediaChannel final : public VoiceMediaChannel,
     return VoiceMediaChannel::SendRtcp(&packet, rtc_options);
   }
   bool AddFileStream(const std::string& file) override;
+  bool RemoveFileStream() override;
+  bool PauseFileStream(bool pause) override;
+  bool SetFileStreamVolume(float volume) override;
+  float GetFileStreamVolume() override;
+
+  void SetPlayCallback(webrtc::PlayCallback* tick) override;
+  bool SetPlayTime(int64_t time) override;
+  int64_t GetPlayTotalTime() override;
 
  private:
   bool SetOptions(const AudioOptions& options);

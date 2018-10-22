@@ -101,6 +101,12 @@ bool FileWrapper::OpenFile(const char* file_name_utf8, bool read_only) {
     return false;
 
   file_ = FileOpen(file_name_utf8, read_only);
+  if (file_ != nullptr) {
+    fseek(file_, 0, SEEK_END);
+    length_ = _ftelli64(file_);
+    fseek(file_, 0, SEEK_SET);
+  }
+
   return file_ != nullptr;
 }
 
@@ -150,5 +156,39 @@ void FileWrapper::CloseFileImpl() {
 int FileWrapper::FlushImpl() {
   return (file_ != nullptr) ? fflush(file_) : -1;
 }
+
+int64_t FileWrapper::Tell() {
+  rtc::CritScope lock(&lock_);
+  if (file_ == nullptr) {
+    return -1;
+  }
+  return _ftelli64(file_);
+}
+
+int FileWrapper::Seek(int64_t pos) {
+  rtc::CritScope lock(&lock_);
+  if (file_ == nullptr) {
+    return -1;
+  }
+
+  int64_t curpos = _ftelli64(file_);
+  fseek(file_, 0, SEEK_END);
+  int64_t len = _ftelli64(file_);
+
+  if (pos > len) {
+    fseek(file_, curpos, SEEK_SET);
+    return -1;
+  }
+
+  position_ = pos;
+
+  return fseek(file_, pos, SEEK_SET);
+}
+
+int64_t FileWrapper::Length() {
+  rtc::CritScope lock(&lock_);
+  return length_;
+};
+
 
 }  // namespace webrtc

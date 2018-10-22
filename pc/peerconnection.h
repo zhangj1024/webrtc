@@ -268,6 +268,13 @@ class PeerConnection : public PeerConnectionInternal,
   void EnableSendVideo(bool enable) override;
   void EnableSendAudio(bool enable) override;
   bool AddFileStream(const std::string& file) override;
+  bool RemoveFileStream() override;
+  bool PauseFileStream(bool pause) override;
+  bool SetFileStreamVolume(float volume) override;
+  float GetFileStreamVolume() override;
+  void SetPlayCallback(PlayCallback* tick) override;
+  bool SetPlayTime(int64_t time) override;
+  int64_t GetPlayTotalTime() override;
 
  protected:
   ~PeerConnection() override;

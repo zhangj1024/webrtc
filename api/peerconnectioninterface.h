@@ -1009,6 +1009,13 @@ class PeerConnectionInterface : public rtc::RefCountInterface {
   virtual void EnableSendVideo(bool enable) = 0;
   virtual void EnableSendAudio(bool enable) = 0;
   virtual bool AddFileStream(const std::string& file) = 0;
+  virtual bool RemoveFileStream() = 0;
+  virtual bool PauseFileStream(bool pause) = 0;
+  virtual bool SetFileStreamVolume(float volume) = 0;
+  virtual float GetFileStreamVolume() = 0;
+  virtual void SetPlayCallback(PlayCallback* tick) = 0;
+  virtual bool SetPlayTime(int64_t time) = 0;
+  virtual int64_t GetPlayTotalTime() = 0;
 
  protected:
   // Dtor protected as objects shouldn't be deleted via this interface.

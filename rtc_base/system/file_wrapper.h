@@ -63,6 +63,10 @@ class FileWrapper final {
   int Read(void* buf, size_t length);
   bool Write(const void* buf, size_t length);
 
+  int64_t Tell();
+  int Seek(int64_t pos);
+  int64_t Length();
+
  private:
   FileWrapper();
 
@@ -75,6 +79,8 @@ class FileWrapper final {
   FILE* file_ = nullptr;
   size_t position_ = 0;
   size_t max_size_in_bytes_ = 0;
+
+  int64_t length_ = -1;
 
   // Copying is not supported.
   FileWrapper(const FileWrapper&) = delete;

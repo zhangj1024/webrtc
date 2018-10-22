@@ -43,6 +43,32 @@ bool MediaChannel::AddFileStream(const std::string& file) {
   return false;
 }
 
+bool MediaChannel::RemoveFileStream() {
+  return false;
+}
+
+bool MediaChannel::PauseFileStream(bool pause) {
+  return false;
+}
+
+bool MediaChannel::SetFileStreamVolume(float volume) {
+  return false;
+}
+
+float MediaChannel::GetFileStreamVolume() {
+  return 0;
+}
+
+void MediaChannel::SetPlayCallback(webrtc::PlayCallback* tick) {}
+
+bool MediaChannel::SetPlayTime(int64_t time) {
+  return false;
+}
+
+int64_t MediaChannel::GetPlayTotalTime() {
+  return 0;
+}
+
 MediaSenderInfo::MediaSenderInfo() = default;
 MediaSenderInfo::~MediaSenderInfo() = default;
 

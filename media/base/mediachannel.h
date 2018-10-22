@@ -45,6 +45,7 @@
 #include "rtc_base/stringencode.h"
 #include "rtc_base/strings/string_builder.h"
 #include "rtc_base/third_party/sigslot/sigslot.h"
+#include "modules/audio_device/include/audio_file_playback.h"
 
 namespace rtc {
 class Timing;
@@ -217,6 +218,13 @@ class MediaChannel : public sigslot::has_slots<> {
   virtual bool RemoveRecvStream(uint32_t ssrc) = 0;
 
   virtual bool AddFileStream(const std::string& file);
+  virtual bool RemoveFileStream();
+  virtual bool PauseFileStream(bool pause);
+  virtual bool SetFileStreamVolume(float volume);
+  virtual float GetFileStreamVolume();
+  virtual void SetPlayCallback(webrtc::PlayCallback* tick);
+  virtual bool SetPlayTime(int64_t time);
+  virtual int64_t GetPlayTotalTime();
 
   // Returns the absoulte sendtime extension id value from media channel.
   virtual int GetRtpSendTimeExtnId() const;

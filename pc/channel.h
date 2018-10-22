@@ -187,6 +187,13 @@ class BaseChannel : public rtc::MessageHandler,
   void SetEnableReceive(bool enable);
 
   bool AddFileStream(const std::string& file);
+  bool RemoveFileStream();
+  bool PauseFileStream(bool pause);
+  bool SetFileStreamVolume(float volume);
+  float GetFileStreamVolume();
+  void SetPlayCallback(webrtc::PlayCallback* tick);
+  bool SetPlayTime(int64_t time);
+  int64_t GetPlayTotalTime();
 
  protected:
   virtual MediaChannel* media_channel() const { return media_channel_.get(); }
@@ -258,11 +265,15 @@ class BaseChannel : public rtc::MessageHandler,
 
   bool AddRecvStream_w(const StreamParams& sp);
   bool RemoveRecvStream_w(uint32_t ssrc);
-  bool AddSendStream_w(const StreamParams& sp);
-  bool RemoveSendStream_w(uint32_t ssrc);
 
   bool AddFileStream_w(const std::string& file);
-
+  bool RemoveFileStream_w();
+  bool PauseFileStream_w(bool pause);
+  bool SetFileStreamVolume_w(float volume);
+  float GetFileStreamVolume_w();
+  void SetPlayCallback_w(webrtc::PlayCallback* tick);
+  bool SetPlayTime_w(int64_t time);
+  int64_t GetPlayTotalTime_w();
 
   // Should be called whenever the conditions for
   // IsReadyToReceiveMedia/IsReadyToSendMedia are satisfied (or unsatisfied).

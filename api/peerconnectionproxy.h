@@ -136,6 +136,14 @@ PROXY_METHOD0(void, Close)
 PROXY_METHOD1(void, EnableSendVideo, bool)
 PROXY_METHOD1(void, EnableSendAudio, bool)
 PROXY_METHOD1(bool, AddFileStream, const std::string&)
+PROXY_METHOD0(bool, RemoveFileStream)
+PROXY_METHOD1(bool, PauseFileStream, bool)
+PROXY_METHOD1(bool, SetFileStreamVolume, float)
+PROXY_METHOD0(float, GetFileStreamVolume)
+PROXY_METHOD1(void, SetPlayCallback, PlayCallback*)
+PROXY_METHOD1(bool, SetPlayTime, int64_t)
+PROXY_METHOD0(int64_t, GetPlayTotalTime)
+
 END_PROXY_MAP()
 
 }  // namespace webrtc

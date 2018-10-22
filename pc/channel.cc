@@ -590,6 +590,41 @@ bool BaseChannel::AddFileStream_w(const std::string& file) {
   return media_channel()->AddFileStream(file);
 }
 
+bool BaseChannel::RemoveFileStream_w() {
+  RTC_DCHECK(worker_thread() == rtc::Thread::Current());
+  return media_channel()->RemoveFileStream();
+}
+
+bool BaseChannel::PauseFileStream_w(bool pause) {
+  RTC_DCHECK(worker_thread() == rtc::Thread::Current());
+  return media_channel()->PauseFileStream(pause);
+}
+
+bool BaseChannel::SetFileStreamVolume_w(float volume) {
+  RTC_DCHECK(worker_thread() == rtc::Thread::Current());
+  return media_channel()->SetFileStreamVolume(volume);
+}
+
+float BaseChannel::GetFileStreamVolume_w() {
+  RTC_DCHECK(worker_thread() == rtc::Thread::Current());
+  return media_channel()->GetFileStreamVolume();
+}
+
+void BaseChannel::SetPlayCallback_w(webrtc::PlayCallback* tick) {
+  RTC_DCHECK(worker_thread() == rtc::Thread::Current());
+  media_channel()->SetPlayCallback(tick);
+}
+
+bool BaseChannel::SetPlayTime_w(int64_t time) {
+  RTC_DCHECK(worker_thread() == rtc::Thread::Current());
+  return media_channel()->SetPlayTime(time);
+}
+
+int64_t BaseChannel::GetPlayTotalTime_w() {
+  RTC_DCHECK(worker_thread() == rtc::Thread::Current());
+  return media_channel()->GetPlayTotalTime();
+}
+
 bool BaseChannel::UpdateLocalStreams_w(const std::vector<StreamParams>& streams,
                                        SdpType type,
                                        std::string* error_desc) {
@@ -794,8 +829,43 @@ void BaseChannel::DisableReceive_w() {
 }
 
 bool BaseChannel::AddFileStream(const std::string& file) {
- return worker_thread_->Invoke<bool>(RTC_FROM_HERE,
-                               Bind(&BaseChannel::AddFileStream_w, this, file));
+  return worker_thread_->Invoke<bool>(
+      RTC_FROM_HERE, Bind(&BaseChannel::AddFileStream_w, this, file));
+}
+
+bool BaseChannel::RemoveFileStream() {
+  return worker_thread_->Invoke<bool>(
+      RTC_FROM_HERE, Bind(&BaseChannel::RemoveFileStream_w, this));
+}
+
+bool BaseChannel::PauseFileStream(bool pause) {
+  return worker_thread_->Invoke<bool>(
+      RTC_FROM_HERE, Bind(&BaseChannel::PauseFileStream_w, this, pause));
+}
+
+bool BaseChannel::SetFileStreamVolume(float volume) {
+  return worker_thread_->Invoke<bool>(
+      RTC_FROM_HERE, Bind(&BaseChannel::SetFileStreamVolume_w, this, volume));
+}
+
+float BaseChannel::GetFileStreamVolume() {
+  return worker_thread_->Invoke<float>(
+      RTC_FROM_HERE, Bind(&BaseChannel::GetFileStreamVolume_w, this));
+}
+
+void BaseChannel::SetPlayCallback(webrtc::PlayCallback* tick) {
+  worker_thread_->Invoke<void>(RTC_FROM_HERE,
+                               Bind(&BaseChannel::SetPlayCallback_w, this, tick));
+}
+
+bool BaseChannel::SetPlayTime(int64_t time) {
+  return worker_thread_->Invoke<bool>(
+      RTC_FROM_HERE, Bind(&BaseChannel::SetPlayTime_w, this, time));
+}
+
+int64_t BaseChannel::GetPlayTotalTime() {
+  return worker_thread_->Invoke<int64_t>(
+      RTC_FROM_HERE, Bind(&BaseChannel::GetPlayTotalTime_w, this));
 }
 
 VoiceChannel::VoiceChannel(rtc::Thread* worker_thread,

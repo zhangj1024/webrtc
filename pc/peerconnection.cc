@@ -6319,18 +6319,87 @@ void PeerConnection::EnableSendAudio(bool enable) {
   EnableChannelSend(GetTransceiverChannel(GetFirstAudioTransceiver()), enable);
 }
 
-bool PeerConnection::AddFileStream(const std::string& file) {
-  // get audio channel
+cricket::BaseChannel* GetAudioChannel(
+    std::vector<
+        rtc::scoped_refptr<RtpTransceiverProxyWithInternal<RtpTransceiver>>>
+        transceivers_) {
   for (auto transceiver : transceivers_) {
     if (transceiver->media_type() == cricket::MEDIA_TYPE_AUDIO) {
-      cricket::BaseChannel* channel = transceiver->internal()->channel();
-      if (channel) {
-        return channel->AddFileStream(file);
-      }
+      return transceiver->internal()->channel();
     }
+  }
+  return NULL;
+}
+
+bool PeerConnection::AddFileStream(const std::string& file) {
+  cricket::BaseChannel* channel = GetAudioChannel(transceivers_);
+  if (channel) {
+    return channel->AddFileStream(file);
   }
 
   return false;
 }
+
+bool PeerConnection::RemoveFileStream() {
+  cricket::BaseChannel* channel = GetAudioChannel(transceivers_);
+  if (channel) {
+    return channel->RemoveFileStream();
+  }
+
+  return false;
+}
+
+bool PeerConnection::PauseFileStream(bool pause) {
+  cricket::BaseChannel* channel = GetAudioChannel(transceivers_);
+  if (channel) {
+    return channel->PauseFileStream(pause);
+  }
+
+  return false;
+}
+
+bool PeerConnection::SetFileStreamVolume(float volume) {
+  cricket::BaseChannel* channel = GetAudioChannel(transceivers_);
+  if (channel) {
+    return channel->SetFileStreamVolume(volume);
+  }
+
+  return false;
+}
+
+float PeerConnection::GetFileStreamVolume() {
+  cricket::BaseChannel* channel = GetAudioChannel(transceivers_);
+  if (channel) {
+    return channel->GetFileStreamVolume();
+  }
+
+  return 0;
+}
+
+void PeerConnection::SetPlayCallback(PlayCallback* tick) {
+  cricket::BaseChannel* channel = GetAudioChannel(transceivers_);
+  if (channel) {
+    channel->SetPlayCallback(tick);
+  }
+}
+
+bool PeerConnection::SetPlayTime(int64_t time) {
+  cricket::BaseChannel* channel = GetAudioChannel(transceivers_);
+  if (channel) {
+    return channel->SetPlayTime(time);
+  }
+
+  return false;
+}
+
+int64_t PeerConnection::GetPlayTotalTime() {
+  cricket::BaseChannel* channel = GetAudioChannel(transceivers_);
+  if (channel) {
+    return channel->GetPlayTotalTime();
+  }
+
+  return 0;
+}
+
 
 }  // namespace webrtc
