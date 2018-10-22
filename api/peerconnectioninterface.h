@@ -1016,6 +1016,8 @@ class PeerConnectionInterface : public rtc::RefCountInterface {
   virtual void SetPlayCallback(PlayCallback* tick) = 0;
   virtual bool SetPlayTime(int64_t time) = 0;
   virtual int64_t GetPlayTotalTime() = 0;
+  virtual bool IsPause() = 0;
+  virtual bool IsPlaying() = 0;
 
  protected:
   // Dtor protected as objects shouldn't be deleted via this interface.

@@ -275,6 +275,8 @@ class PeerConnection : public PeerConnectionInternal,
   void SetPlayCallback(PlayCallback* tick) override;
   bool SetPlayTime(int64_t time) override;
   int64_t GetPlayTotalTime() override;
+  bool IsPause() override;
+  bool IsPlaying() override;
 
  protected:
   ~PeerConnection() override;

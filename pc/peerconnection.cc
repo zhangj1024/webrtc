@@ -6401,5 +6401,23 @@ int64_t PeerConnection::GetPlayTotalTime() {
   return 0;
 }
 
+bool PeerConnection::IsPause() {
+  cricket::BaseChannel* channel = GetAudioChannel(transceivers_);
+  if (channel) {
+    return channel->IsPause();
+  }
+
+  return false;
+}
+
+bool PeerConnection::IsPlaying() {
+  cricket::BaseChannel* channel = GetAudioChannel(transceivers_);
+  if (channel) {
+    return channel->IsPlaying();
+  }
+
+  return false;
+}
+
 
 }  // namespace webrtc

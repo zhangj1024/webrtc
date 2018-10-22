@@ -123,7 +123,8 @@ class Conductor : public webrtc::PeerConnectionObserver,
 
   //play back
   void OnPlayTimer(int64_t cur, int64_t total) override;
-  void OnPlayEnded() override;
+  void OnPlayStart(bool start) override;
+  void OnPlayPause(bool pause) override;
 
  protected:
   // Send a message to the remote peer.

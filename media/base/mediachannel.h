@@ -225,6 +225,8 @@ class MediaChannel : public sigslot::has_slots<> {
   virtual void SetPlayCallback(webrtc::PlayCallback* tick);
   virtual bool SetPlayTime(int64_t time);
   virtual int64_t GetPlayTotalTime();
+  virtual bool IsPause();
+  virtual bool IsPlaying();
 
   // Returns the absoulte sendtime extension id value from media channel.
   virtual int GetRtpSendTimeExtnId() const;

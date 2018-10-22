@@ -7,11 +7,11 @@
 #include "call/call.h"
 #include "call/syncable.h"
 #include "common_audio/resampler/include/push_resampler.h"
+#include "modules/audio_device/include/audio_file_playback.h"
 #include "rtc_base/asyncinvoker.h"
 #include "rtc_base/platform_thread.h"
 #include "rtc_base/system/file_wrapper.h"
 #include "rtc_base/thread_checker.h"
-#include "modules/audio_device/include/audio_file_playback.h"
 
 namespace webrtc {
 
@@ -44,6 +44,8 @@ class WebRtcVoiceFileStream final : public AudioTick {
   };
 
   void SetPause(bool pause);
+  bool IsPause() { return pause_; };
+  bool IsPlaying() { return playing_; };
 
   void SetPlayCallback(PlayCallback* tick) { tick_ = tick; };
   bool SetPlayTime(int64_t time);
@@ -67,6 +69,7 @@ class WebRtcVoiceFileStream final : public AudioTick {
   rtc::scoped_refptr<webrtc::AudioState> audio_state_;
 
   volatile bool playing_ = false;
+  volatile bool pause_ = false;
 
   std::string _inputFilename;
   FileWrapper& _inputFile;
@@ -76,7 +79,7 @@ class WebRtcVoiceFileStream final : public AudioTick {
 
   PushResampler<int16_t> resampler;
 
-  volatile float output_gain = 0.1f;
+  volatile float output_gain = 1.0f;
 
   InternalFileAudioSource* playsource_;
   InternalFileAudioSource* recordsource_;

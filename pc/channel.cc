@@ -625,6 +625,16 @@ int64_t BaseChannel::GetPlayTotalTime_w() {
   return media_channel()->GetPlayTotalTime();
 }
 
+bool BaseChannel::IsPause_w() {
+  RTC_DCHECK(worker_thread() == rtc::Thread::Current());
+  return media_channel()->IsPause();
+}
+
+bool BaseChannel::IsPlaying_w() {
+  RTC_DCHECK(worker_thread() == rtc::Thread::Current());
+  return media_channel()->IsPlaying();
+}
+
 bool BaseChannel::UpdateLocalStreams_w(const std::vector<StreamParams>& streams,
                                        SdpType type,
                                        std::string* error_desc) {
@@ -866,6 +876,16 @@ bool BaseChannel::SetPlayTime(int64_t time) {
 int64_t BaseChannel::GetPlayTotalTime() {
   return worker_thread_->Invoke<int64_t>(
       RTC_FROM_HERE, Bind(&BaseChannel::GetPlayTotalTime_w, this));
+}
+
+bool BaseChannel::IsPause() {
+  return worker_thread_->Invoke<bool>(
+      RTC_FROM_HERE, Bind(&BaseChannel::IsPause_w, this));
+}
+
+bool BaseChannel::IsPlaying() {
+  return worker_thread_->Invoke<bool>(
+      RTC_FROM_HERE, Bind(&BaseChannel::IsPlaying_w, this));
 }
 
 VoiceChannel::VoiceChannel(rtc::Thread* worker_thread,

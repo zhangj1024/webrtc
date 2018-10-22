@@ -69,6 +69,14 @@ int64_t MediaChannel::GetPlayTotalTime() {
   return 0;
 }
 
+bool MediaChannel::IsPause() {
+  return false;
+}
+
+bool MediaChannel::IsPlaying() {
+  return false;
+}
+
 MediaSenderInfo::MediaSenderInfo() = default;
 MediaSenderInfo::~MediaSenderInfo() = default;
 

@@ -583,10 +583,10 @@ void Conductor::OnSuccess(webrtc::SessionDescriptionInterface* desc) {
   peer_connection_->SetLocalDescription(
       DummySetSessionDescriptionObserver::Create(), desc);
 
+  peer_connection_->SetPlayCallback(this);
   peer_connection_->AddFileStream(std::string("F://1_1channel.pcm"));
   peer_connection_->PauseFileStream(true);
   peer_connection_->PauseFileStream(false);
-  peer_connection_->SetPlayCallback(this);
   peer_connection_->SetPlayTime(20 * 1000);
   RTC_LOG(LS_ERROR) << "GetPlayTotalTime:" << peer_connection_->GetPlayTotalTime();
 
@@ -623,13 +623,14 @@ void Conductor::SendMessage(const std::string& json_object) {
   main_wnd_->QueueUIThreadCallback(SEND_MESSAGE_TO_PEER, msg);
 }
 
-void Conductor::OnPlayTimer(int64_t cur, int64_t total)
-{
-	RTC_LOG(LERROR) << cur << " / " << total;
+void Conductor::OnPlayTimer(int64_t cur, int64_t total) {
+  RTC_LOG(LERROR) << cur << " / " << total;
 }
 
-void Conductor::OnPlayEnded()
-{
-	RTC_LOG(LERROR) << "OnPlayEnded";
+void Conductor::OnPlayStart(bool start) {
+  RTC_LOG(LERROR) << "OnPlayStart : " << start;
 }
 
+void Conductor::OnPlayPause(bool pause) {
+  RTC_LOG(LERROR) << "OnPlayPause : " << pause;
+}

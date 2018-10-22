@@ -217,6 +217,8 @@ class WebRtcVoiceMediaChannel final : public VoiceMediaChannel,
   void SetPlayCallback(webrtc::PlayCallback* tick) override;
   bool SetPlayTime(int64_t time) override;
   int64_t GetPlayTotalTime() override;
+  bool IsPause() override;
+  bool IsPlaying() override;
 
  private:
   bool SetOptions(const AudioOptions& options);
@@ -292,7 +294,7 @@ class WebRtcVoiceMediaChannel final : public VoiceMediaChannel,
   const webrtc::AudioCodecPairId codec_pair_id_ =
       webrtc::AudioCodecPairId::Create();
 
-  webrtc::WebRtcVoiceFileStream* fileStream = NULL;
+  webrtc::WebRtcVoiceFileStream* fileStream_ = NULL;
 
   RTC_DISALLOW_IMPLICIT_CONSTRUCTORS(WebRtcVoiceMediaChannel);
 };

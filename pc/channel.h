@@ -194,6 +194,8 @@ class BaseChannel : public rtc::MessageHandler,
   void SetPlayCallback(webrtc::PlayCallback* tick);
   bool SetPlayTime(int64_t time);
   int64_t GetPlayTotalTime();
+  bool IsPause();
+  bool IsPlaying();
 
  protected:
   virtual MediaChannel* media_channel() const { return media_channel_.get(); }
@@ -274,6 +276,8 @@ class BaseChannel : public rtc::MessageHandler,
   void SetPlayCallback_w(webrtc::PlayCallback* tick);
   bool SetPlayTime_w(int64_t time);
   int64_t GetPlayTotalTime_w();
+  bool IsPause_w();
+  bool IsPlaying_w();
 
   // Should be called whenever the conditions for
   // IsReadyToReceiveMedia/IsReadyToSendMedia are satisfied (or unsatisfied).

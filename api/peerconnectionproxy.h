@@ -143,6 +143,8 @@ PROXY_METHOD0(float, GetFileStreamVolume)
 PROXY_METHOD1(void, SetPlayCallback, PlayCallback*)
 PROXY_METHOD1(bool, SetPlayTime, int64_t)
 PROXY_METHOD0(int64_t, GetPlayTotalTime)
+PROXY_METHOD0(bool, IsPause)
+PROXY_METHOD0(bool, IsPlaying)
 
 END_PROXY_MAP()
 

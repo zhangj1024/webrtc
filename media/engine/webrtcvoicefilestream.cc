@@ -153,7 +153,7 @@ void WebRtcVoiceFileStream::Stop() {
       return;
     }
 
-    SetEvent(_hPauseEvent);
+	SetPause(false);
 
     // stop the driving thread...
     RTC_LOG(LS_VERBOSE)
@@ -242,6 +242,12 @@ DWORD WINAPI WebRtcVoiceFileStream::FileThreadFunc(LPVOID context) {
 }
 
 bool WebRtcVoiceFileStream::FileThreadProcess() {
+  if (tick_ != nullptr) {
+    tick_->OnPlayStart(true);
+  }
+  
+  lastTime_ = 0;
+
   bool keepPlaying = true;
 
   while (keepPlaying) {
@@ -301,7 +307,7 @@ bool WebRtcVoiceFileStream::FileThreadProcess() {
   }
 
   if (tick_ != nullptr) {
-    tick_->OnPlayEnded();
+    tick_->OnPlayStart(false);
   }
 
   invoker_.AsyncInvoke<void>(RTC_FROM_HERE, worker_thread_,
@@ -310,10 +316,14 @@ bool WebRtcVoiceFileStream::FileThreadProcess() {
 }
 
 void WebRtcVoiceFileStream::SetPause(bool pause) {
+  pause_ = pause;
   if (pause) {
     ResetEvent(_hPauseEvent);
   } else {
     SetEvent(_hPauseEvent);
+  }
+  if (tick_ != nullptr) {
+    tick_->OnPlayPause(pause_);
   }
 }
 
@@ -335,7 +345,7 @@ int64_t WebRtcVoiceFileStream::GetPlayTime() {
   if (!playing_ || !_inputFile.is_open()) {
     return 0;
   }
-  return _inputFile.Tell() / datalenIn10Ms * 10;
+  return _inputFile.Tell() / datalenIn10Ms * 10/*ms*/;
 }
 
 bool WebRtcVoiceFileStream::SetPlayTime(int64_t time) {
@@ -343,7 +353,12 @@ bool WebRtcVoiceFileStream::SetPlayTime(int64_t time) {
     return false;
   }
 
-  return (_inputFile.Seek(time / 10 * datalenIn10Ms) == 0);
+  if (_inputFile.Seek(time / 10 * datalenIn10Ms) == 0) {
+    lastTime_ = 0;
+    return true;
+  } else {
+    return false;
+  }
 }
 
 }  // namespace webrtc

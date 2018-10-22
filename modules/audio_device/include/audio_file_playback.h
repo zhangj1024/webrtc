@@ -15,7 +15,8 @@ namespace webrtc {
 class PlayCallback {
  public:
   virtual void OnPlayTimer(int64_t cur, int64_t total) = 0;
-  virtual void OnPlayEnded() = 0;
+  virtual void OnPlayStart(bool start) = 0;
+  virtual void OnPlayPause(bool pause) = 0;
 };
 }  // namespace webrtc
 
