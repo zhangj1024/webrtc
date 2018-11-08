@@ -619,7 +619,7 @@ void Conductor::OnSuccess(webrtc::SessionDescriptionInterface* desc) {
 
   lyric = webrtc::LyricRenderInterface::Create();
 
-    char path[] = "F://bucai.lrc";
+  char path[] = "F://bucai.lrc";
   FILE* p = NULL;
   p = fopen(path, "r");
   if (p == NULL) {
@@ -633,12 +633,11 @@ void Conductor::OnSuccess(webrtc::SessionDescriptionInterface* desc) {
   }
   lyric->SetLyric(UTF8_To_string(text));
 
-
   capture->AddOrUpdateLyric(lyric);
   peer_connection_->AddPlayCallback(lyric);
   //   peer_connection_->PauseFileStream(true);
   //   peer_connection_->PauseFileStream(false);
-     peer_connection_->SetPlayTime(250 * 1000);
+//   peer_connection_->SetPlayTime(260 * 1000);
   //   RTC_LOG(LS_ERROR) << "GetPlayTotalTime:" <<
   //   peer_connection_->GetPlayTotalTime();
   //
@@ -677,7 +676,7 @@ void Conductor::SendMessage(const std::string& json_object) {
 }
 
 void Conductor::OnPlayTimer(int64_t cur, int64_t total) {
-  RTC_LOG(LERROR) << cur << " / " << total;
+  //   RTC_LOG(LERROR) << cur << " / " << total;
 }
 
 void Conductor::OnPlayStart(bool start) {

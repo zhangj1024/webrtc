@@ -54,7 +54,7 @@ bool LyricWord::Prase(std::string& wordTime) {
     _continue = stoll(times.at(1));
   }
 
-  _word = wordTime.substr(rIndex + 1, wordTime.length() - rIndex - 1);
+  _word = wordTime.erase(0, rIndex + 1);
   return true;
 }
 
@@ -64,6 +64,7 @@ std::string LyricWord::GetStream() {
   return text;
 }
 
+#define SPACE_WIDTH 10
 void LyricWord::PraseBitmapGlyph(FT_Face& pFTFace) {
   for (auto it = glyphs.begin(); it != glyphs.end(); it++) {
     if (*it != NULL) {
@@ -90,6 +91,11 @@ void LyricWord::PraseBitmapGlyph(FT_Face& pFTFace) {
     if (!FT_Get_Glyph(pFTFace->glyph, &glyph)) {
       //  convert glyph to bitmap with 256 gray
       FT_Glyph_To_Bitmap(&glyph, ft_render_mode_normal, 0, 0);
+      FT_BitmapGlyph bitmap_glyph = (FT_BitmapGlyph)glyph;
+      FT_Bitmap& bitmap = bitmap_glyph->bitmap;
+      if (bitmap.width == 0) {
+        bitmap.width = SPACE_WIDTH;
+      }
       glyphs.push_back(glyph);
     }
   }
@@ -130,7 +136,7 @@ bool LyricLine::Prase(std::string& line) {
   _offset = stoll(lineTime.substr(lIndex, mIndex - lIndex - 1));
   _continue = stoll(lineTime.substr(mIndex, rIndex - mIndex - 1));
 
-  line = line.substr(rIndex + 1, line.length() - rIndex - 1);
+  line.erase(0, rIndex + 1);
 
   std::vector<std::string> words = split(line, "<");
   for (auto it = words.begin(); it != words.end(); it++) {
