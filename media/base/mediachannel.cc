@@ -59,7 +59,8 @@ float MediaChannel::GetFileStreamVolume() {
   return 0;
 }
 
-void MediaChannel::SetPlayCallback(webrtc::PlayCallback* tick) {}
+void MediaChannel::AddPlayCallback(webrtc::PlayCallback* tick) {}
+void MediaChannel::RemovePlayCallback(webrtc::PlayCallback* tick) {}
 
 bool MediaChannel::SetPlayTime(int64_t time) {
   return false;

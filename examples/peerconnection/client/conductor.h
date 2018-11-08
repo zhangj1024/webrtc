@@ -25,6 +25,7 @@
 
 namespace webrtc {
 class VideoCaptureModule;
+class LyricRenderInterface;
 }  // namespace webrtc
 
 namespace cricket {
@@ -139,6 +140,9 @@ class Conductor : public webrtc::PeerConnectionObserver,
   MainWindow* main_wnd_;
   std::deque<std::string*> pending_messages_;
   std::string server_;
+
+  cricket::VideoCapturer* capture = NULL;
+  webrtc::LyricRenderInterface *lyric = NULL;
 };
 
 #endif  // EXAMPLES_PEERCONNECTION_CLIENT_CONDUCTOR_H_

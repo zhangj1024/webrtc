@@ -1953,51 +1953,33 @@ bool WebRtcVoiceMediaChannel::SetFileStreamVolume(float volume) {
 }
 
 float WebRtcVoiceMediaChannel::GetFileStreamVolume() {
-  if (fileStream_ == NULL) {
-    return 0;
-  }
-
-  return fileStream_->GetGain();
+  return fileStream_ != NULL ? fileStream_->GetGain() : 0;
 }
 
-void WebRtcVoiceMediaChannel::SetPlayCallback(webrtc::PlayCallback* tick) {
-  if (fileStream_ == NULL) {
-    return;
-  }
+void WebRtcVoiceMediaChannel::AddPlayCallback(webrtc::PlayCallback* tick) {
+  if (fileStream_ != NULL)
+	  fileStream_->AddPlayCallback(tick);
+}
 
-  fileStream_->SetPlayCallback(tick);
+void WebRtcVoiceMediaChannel::RemovePlayCallback(webrtc::PlayCallback* tick) {
+  if (fileStream_ != NULL)
+    fileStream_->RemovePlayCallback(tick);
 }
 
 bool WebRtcVoiceMediaChannel::SetPlayTime(int64_t time) {
-  if (fileStream_ == NULL) {
-    return false;
-  }
-
-  return fileStream_->SetPlayTime(time);
+  return fileStream_ != NULL ? fileStream_->SetPlayTime(time) : false;
 }
 
 int64_t WebRtcVoiceMediaChannel::GetPlayTotalTime() {
-  if (fileStream_ == NULL) {
-    return 0;
-  }
-
-  return fileStream_->GetPlayTotalTime();
+  return fileStream_ != NULL ? fileStream_->GetPlayTotalTime() : 0;
 }
 
 bool WebRtcVoiceMediaChannel::IsPause() {
-  if (fileStream_ == NULL) {
-    return false;
-  }
-
-  return fileStream_->IsPause();
+  return fileStream_ != NULL ? fileStream_->IsPause() : false;
 }
 
 bool WebRtcVoiceMediaChannel::IsPlaying() {
-  if (fileStream_ == NULL) {
-    return false;
-  }
-
-  return fileStream_->IsPlaying();
+  return fileStream_ != NULL ? fileStream_->IsPlaying() : false;
 }
 
 bool WebRtcVoiceMediaChannel::SetLocalSource(uint32_t ssrc,

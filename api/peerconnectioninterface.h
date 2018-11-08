@@ -1013,7 +1013,8 @@ class PeerConnectionInterface : public rtc::RefCountInterface {
   virtual bool PauseFileStream(bool pause) = 0;
   virtual bool SetFileStreamVolume(float volume) = 0;
   virtual float GetFileStreamVolume() = 0;
-  virtual void SetPlayCallback(PlayCallback* tick) = 0;
+  virtual void AddPlayCallback(PlayCallback* tick) = 0;
+  virtual void RemovePlayCallback(PlayCallback* tick) = 0;
   virtual bool SetPlayTime(int64_t time) = 0;
   virtual int64_t GetPlayTotalTime() = 0;
   virtual bool IsPause() = 0;

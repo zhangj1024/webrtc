@@ -214,7 +214,8 @@ class WebRtcVoiceMediaChannel final : public VoiceMediaChannel,
   bool SetFileStreamVolume(float volume) override;
   float GetFileStreamVolume() override;
 
-  void SetPlayCallback(webrtc::PlayCallback* tick) override;
+  void AddPlayCallback(webrtc::PlayCallback* tick) override;
+  void RemovePlayCallback(webrtc::PlayCallback* tick) override;
   bool SetPlayTime(int64_t time) override;
   int64_t GetPlayTotalTime() override;
   bool IsPause() override;

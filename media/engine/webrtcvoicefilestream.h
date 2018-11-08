@@ -47,7 +47,8 @@ class WebRtcVoiceFileStream final : public AudioTick {
   bool IsPause() { return pause_; };
   bool IsPlaying() { return playing_; };
 
-  void SetPlayCallback(PlayCallback* tick) { tick_ = tick; };
+  void AddPlayCallback(PlayCallback* tick);
+  void RemovePlayCallback(PlayCallback* tick);
   bool SetPlayTime(int64_t time);
   int64_t GetPlayTotalTime() { return totalTime_; };
 
@@ -84,7 +85,7 @@ class WebRtcVoiceFileStream final : public AudioTick {
   InternalFileAudioSource* playsource_;
   InternalFileAudioSource* recordsource_;
 
-  PlayCallback* tick_ = nullptr;
+  std::vector<PlayCallback*> ticks_;
   int64_t lastTime_ = 0;
   int64_t totalTime_ = 0;
 

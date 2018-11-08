@@ -610,9 +610,14 @@ float BaseChannel::GetFileStreamVolume_w() {
   return media_channel()->GetFileStreamVolume();
 }
 
-void BaseChannel::SetPlayCallback_w(webrtc::PlayCallback* tick) {
+void BaseChannel::AddPlayCallback_w(webrtc::PlayCallback* tick) {
   RTC_DCHECK(worker_thread() == rtc::Thread::Current());
-  media_channel()->SetPlayCallback(tick);
+  media_channel()->AddPlayCallback(tick);
+}
+
+void BaseChannel::RemovePlayCallback_w(webrtc::PlayCallback* tick) {
+  RTC_DCHECK(worker_thread() == rtc::Thread::Current());
+  media_channel()->RemovePlayCallback(tick);
 }
 
 bool BaseChannel::SetPlayTime_w(int64_t time) {
@@ -863,9 +868,14 @@ float BaseChannel::GetFileStreamVolume() {
       RTC_FROM_HERE, Bind(&BaseChannel::GetFileStreamVolume_w, this));
 }
 
-void BaseChannel::SetPlayCallback(webrtc::PlayCallback* tick) {
-  worker_thread_->Invoke<void>(RTC_FROM_HERE,
-                               Bind(&BaseChannel::SetPlayCallback_w, this, tick));
+void BaseChannel::AddPlayCallback(webrtc::PlayCallback* tick) {
+  worker_thread_->Invoke<void>(
+      RTC_FROM_HERE, Bind(&BaseChannel::AddPlayCallback_w, this, tick));
+}
+
+void BaseChannel::RemovePlayCallback(webrtc::PlayCallback* tick) {
+  worker_thread_->Invoke<void>(
+      RTC_FROM_HERE, Bind(&BaseChannel::RemovePlayCallback_w, this, tick));
 }
 
 bool BaseChannel::SetPlayTime(int64_t time) {

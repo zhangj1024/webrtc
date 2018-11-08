@@ -191,7 +191,8 @@ class BaseChannel : public rtc::MessageHandler,
   bool PauseFileStream(bool pause);
   bool SetFileStreamVolume(float volume);
   float GetFileStreamVolume();
-  void SetPlayCallback(webrtc::PlayCallback* tick);
+  void AddPlayCallback(webrtc::PlayCallback* tick);
+  void RemovePlayCallback(webrtc::PlayCallback* tick);
   bool SetPlayTime(int64_t time);
   int64_t GetPlayTotalTime();
   bool IsPause();
@@ -273,7 +274,8 @@ class BaseChannel : public rtc::MessageHandler,
   bool PauseFileStream_w(bool pause);
   bool SetFileStreamVolume_w(float volume);
   float GetFileStreamVolume_w();
-  void SetPlayCallback_w(webrtc::PlayCallback* tick);
+  void AddPlayCallback_w(webrtc::PlayCallback* tick);
+  void RemovePlayCallback_w(webrtc::PlayCallback* tick);
   bool SetPlayTime_w(int64_t time);
   int64_t GetPlayTotalTime_w();
   bool IsPause_w();

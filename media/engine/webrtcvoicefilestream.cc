@@ -153,7 +153,7 @@ void WebRtcVoiceFileStream::Stop() {
       return;
     }
 
-	SetPause(false);
+    SetPause(false);
 
     // stop the driving thread...
     RTC_LOG(LS_VERBOSE)
@@ -242,10 +242,10 @@ DWORD WINAPI WebRtcVoiceFileStream::FileThreadFunc(LPVOID context) {
 }
 
 bool WebRtcVoiceFileStream::FileThreadProcess() {
-  if (tick_ != nullptr) {
-    tick_->OnPlayStart(true);
+  for (auto tick : ticks_) {
+    tick->OnPlayStart(true);
   }
-  
+
   lastTime_ = 0;
 
   bool keepPlaying = true;
@@ -306,8 +306,8 @@ bool WebRtcVoiceFileStream::FileThreadProcess() {
     }
   }
 
-  if (tick_ != nullptr) {
-    tick_->OnPlayStart(false);
+  for (auto tick : ticks_) {
+    tick->OnPlayStart(false);
   }
 
   invoker_.AsyncInvoke<void>(RTC_FROM_HERE, worker_thread_,
@@ -322,13 +322,15 @@ void WebRtcVoiceFileStream::SetPause(bool pause) {
   } else {
     SetEvent(_hPauseEvent);
   }
-  if (tick_ != nullptr) {
-    tick_->OnPlayPause(pause_);
+  RTC_LOG(LS_WARNING) << "Unknown wait termination on capture side";
+
+  for (auto tick : ticks_) {
+    tick->OnPlayPause(pause_);
   }
 }
 
 void WebRtcVoiceFileStream::OnTimeTick() {
-  if (tick_ == nullptr) {
+  if (ticks_.empty()) {
     return;
   }
 
@@ -336,8 +338,10 @@ void WebRtcVoiceFileStream::OnTimeTick() {
   if (curTime - lastTime_ >= 100 /*ms*/) {
     lastTime_ = curTime;
 
-//     RTC_LOG(LS_ERROR) << "lastTime_: " << lastTime_;
-    tick_->OnPlayTimer(lastTime_, totalTime_);
+    //     RTC_LOG(LS_ERROR) << "lastTime_: " << lastTime_;
+    for (auto tick : ticks_) {
+      tick->OnPlayTimer(lastTime_, totalTime_);
+    }
   }
 }
 
@@ -345,7 +349,7 @@ int64_t WebRtcVoiceFileStream::GetPlayTime() {
   if (!playing_ || !_inputFile.is_open()) {
     return 0;
   }
-  return _inputFile.Tell() / datalenIn10Ms * 10/*ms*/;
+  return _inputFile.Tell() / datalenIn10Ms * 10 /*ms*/;
 }
 
 bool WebRtcVoiceFileStream::SetPlayTime(int64_t time) {
@@ -358,6 +362,24 @@ bool WebRtcVoiceFileStream::SetPlayTime(int64_t time) {
     return true;
   } else {
     return false;
+  }
+}
+
+void WebRtcVoiceFileStream::AddPlayCallback(PlayCallback* tick) {
+  for (auto tick_ : ticks_) {
+    if (tick_ == tick) {
+      return;
+    }
+  }
+  ticks_.push_back(tick);
+}
+
+void WebRtcVoiceFileStream::RemovePlayCallback(PlayCallback* tick) {
+  for (auto itr = ticks_.begin(); itr != ticks_.end(); itr++) {
+    if (*itr == tick) {
+      ticks_.erase(itr);
+      break;
+    }
   }
 }
 

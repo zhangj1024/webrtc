@@ -23,6 +23,7 @@
 #include "media/engine/webrtcvideocapturerfactory.h"
 #include "modules/audio_device/include/audio_device.h"
 #include "modules/audio_processing/include/audio_processing.h"
+#include "modules/desktop_capture/win/lyric_render.h"
 #include "modules/video_capture/video_capture_factory.h"
 #include "rtc_base/checks.h"
 #include "rtc_base/json.h"
@@ -133,6 +134,9 @@ bool Conductor::CreatePeerConnection(bool dtls) {
 void Conductor::DeletePeerConnection() {
   main_wnd_->StopLocalRenderer();
   main_wnd_->StopRemoteRenderer();
+  if (peer_connection_) {
+    peer_connection_->RemovePlayCallback(this);
+  }
   peer_connection_ = nullptr;
   peer_connection_factory_ = nullptr;
   peer_id_ = -1;
@@ -481,6 +485,7 @@ void Conductor::AddTracks() {
 #endif
 
   if (video_device) {
+    capture = video_device.get();
     rtc::scoped_refptr<webrtc::VideoTrackInterface> video_track_(
         peer_connection_factory_->CreateVideoTrack(
             kVideoLabel, peer_connection_factory_->CreateVideoSource(
@@ -579,19 +584,67 @@ void Conductor::UIThreadCallback(int msg_id, void* data) {
   }
 }
 
+std::string UTF8_To_string(const std::string& str) {
+  int nwLen = MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, NULL, 0);
+
+  wchar_t* pwBuf = new wchar_t[nwLen + 1];  //一定要加1，不然会出现尾巴
+  memset(pwBuf, 0, nwLen * 2 + 2);
+
+  MultiByteToWideChar(CP_UTF8, 0, str.c_str(), str.length(), pwBuf, nwLen);
+
+  int nLen = WideCharToMultiByte(CP_ACP, 0, pwBuf, -1, NULL, NULL, NULL, NULL);
+
+  char* pBuf = new char[nLen + 1];
+  memset(pBuf, 0, nLen + 1);
+
+  WideCharToMultiByte(CP_ACP, 0, pwBuf, nwLen, pBuf, nLen, NULL, NULL);
+
+  std::string retStr = pBuf;
+
+  delete[] pBuf;
+  delete[] pwBuf;
+
+  pBuf = NULL;
+  pwBuf = NULL;
+
+  return retStr;
+}
+
 void Conductor::OnSuccess(webrtc::SessionDescriptionInterface* desc) {
   peer_connection_->SetLocalDescription(
       DummySetSessionDescriptionObserver::Create(), desc);
 
-  peer_connection_->SetPlayCallback(this);
-  peer_connection_->AddFileStream(std::string("F://1_1channel.pcm"));
-  peer_connection_->PauseFileStream(true);
-  peer_connection_->PauseFileStream(false);
-  peer_connection_->SetPlayTime(20 * 1000);
-  RTC_LOG(LS_ERROR) << "GetPlayTotalTime:" << peer_connection_->GetPlayTotalTime();
+  peer_connection_->AddPlayCallback(this);
+  peer_connection_->AddFileStream(std::string("F://bucai.pcm"));
 
-  static const float volume = 0.5;
-  peer_connection_->SetFileStreamVolume(volume * volume * volume);
+  lyric = webrtc::LyricRenderInterface::Create();
+
+    char path[] = "F://bucai.lrc";
+  FILE* p = NULL;
+  p = fopen(path, "r");
+  if (p == NULL) {
+    return;
+  }
+
+  std::string text;
+  char tmp[1024] = {0};
+  while (fgets(tmp, 1024, p) != NULL) {
+    text.append(tmp);
+  }
+  lyric->SetLyric(UTF8_To_string(text));
+
+
+  capture->AddOrUpdateLyric(lyric);
+  peer_connection_->AddPlayCallback(lyric);
+  //   peer_connection_->PauseFileStream(true);
+  //   peer_connection_->PauseFileStream(false);
+     peer_connection_->SetPlayTime(250 * 1000);
+  //   RTC_LOG(LS_ERROR) << "GetPlayTotalTime:" <<
+  //   peer_connection_->GetPlayTotalTime();
+  //
+  //   static const float volume = 0.5;
+  //   peer_connection_->SetFileStreamVolume(volume * volume * volume);
+
   std::string sdp;
   desc->ToString(&sdp);
 

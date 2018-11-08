@@ -305,6 +305,7 @@ rtc_static_library("desktop_capture_generic") {
     "win/window_capture_utils.cc",
     "win/window_capture_utils.h",
     "window_capturer_win.cc",
+    "window_capturer_win.h",
     "window_finder.cc",
     "window_finder.h",
     "window_finder_win.cc",
@@ -313,6 +314,10 @@ rtc_static_library("desktop_capture_generic") {
     "null_capture.h",
     "win_video_capture.cc",
     "win_video_capture.h",
+    "win/lyric_render.cc",
+    "win/lyric_render.h",
+    "win/lyric_prase.cc",
+    "win/lyric_prase.h",
   ]
 
   if (build_with_mozilla) {
@@ -384,6 +389,7 @@ rtc_static_library("desktop_capture_generic") {
     "../../system_wrappers:cpu_features_api",
     "../../system_wrappers:metrics_api",
     "//third_party/abseil-cpp/absl/memory",
+    "//third_party:freetype_harfbuzz",
   ]
 
   if (build_with_mozilla) {

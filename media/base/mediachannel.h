@@ -222,7 +222,8 @@ class MediaChannel : public sigslot::has_slots<> {
   virtual bool PauseFileStream(bool pause);
   virtual bool SetFileStreamVolume(float volume);
   virtual float GetFileStreamVolume();
-  virtual void SetPlayCallback(webrtc::PlayCallback* tick);
+  virtual void AddPlayCallback(webrtc::PlayCallback* tick);
+  virtual void RemovePlayCallback(webrtc::PlayCallback* tick);
   virtual bool SetPlayTime(int64_t time);
   virtual int64_t GetPlayTotalTime();
   virtual bool IsPause();

@@ -29,9 +29,11 @@
 #include "rtc_base/third_party/sigslot/sigslot.h"
 #include "rtc_base/thread_checker.h"
 #include "rtc_base/timestampaligner.h"
+#include "modules/desktop_capture/win/lyric_render.h"
 
 namespace webrtc {
 class VideoFrame;
+class LyricRenderInterface;
 }
 
 namespace cricket {
@@ -171,6 +173,9 @@ class VideoCapturer : public sigslot::has_slots<>,
                        const rtc::VideoSinkWants& wants) override;
   void RemoveSink(rtc::VideoSinkInterface<webrtc::VideoFrame>* sink) override;
 
+  void AddOrUpdateLyric(webrtc::LyricRenderInterface *lyric);
+  void RemoveLyric(webrtc::LyricRenderInterface* lyric);
+
  protected:
   // OnSinkWantsChanged can be overridden to change the default behavior
   // when a sink changes its VideoSinkWants by calling AddOrUpdateSink.
@@ -273,6 +278,7 @@ class VideoCapturer : public sigslot::has_slots<>,
 
   // State for the timestamp translation.
   rtc::TimestampAligner timestamp_aligner_;
+  webrtc::LyricRenderInterface *lyric_ = NULL;
   RTC_DISALLOW_COPY_AND_ASSIGN(VideoCapturer);
 };
 

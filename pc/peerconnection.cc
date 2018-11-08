@@ -6376,10 +6376,17 @@ float PeerConnection::GetFileStreamVolume() {
   return 0;
 }
 
-void PeerConnection::SetPlayCallback(PlayCallback* tick) {
+void PeerConnection::AddPlayCallback(PlayCallback* tick) {
   cricket::BaseChannel* channel = GetAudioChannel(transceivers_);
   if (channel) {
-    channel->SetPlayCallback(tick);
+    channel->AddPlayCallback(tick);
+  }
+}
+
+void PeerConnection::RemovePlayCallback(PlayCallback* tick) {
+  cricket::BaseChannel* channel = GetAudioChannel(transceivers_);
+  if (channel) {
+    channel->RemovePlayCallback(tick);
   }
 }
 

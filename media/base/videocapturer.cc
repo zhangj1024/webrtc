@@ -16,6 +16,7 @@
 
 #include "api/video/i420_buffer.h"
 #include "api/video/video_frame.h"
+#include "modules/desktop_capture/win/lyric_render.h"
 #include "rtc_base/logging.h"
 
 namespace cricket {
@@ -226,6 +227,9 @@ void VideoCapturer::OnFrame(const webrtc::VideoFrame& frame,
         webrtc::I420Buffer::Rotate(*buffer->GetI420(), frame.rotation()),
         webrtc::kVideoRotation_0, frame.timestamp_us()));
   } else {
+    if (lyric_ != NULL) {
+      lyric_->MaskFrame(frame);
+    }
     broadcaster_.OnFrame(frame);
   }
   UpdateInputSize(orig_width, orig_height);
@@ -377,6 +381,14 @@ void VideoCapturer::UpdateInputSize(int width, int height) {
   input_size_valid_ = true;
   input_width_ = width;
   input_height_ = height;
+}
+
+void VideoCapturer::AddOrUpdateLyric(webrtc::LyricRenderInterface* lyric) {
+  lyric_ = lyric;
+}
+
+void VideoCapturer::RemoveLyric(webrtc::LyricRenderInterface* lyric) {
+  lyric_ = NULL;
 }
 
 }  // namespace cricket

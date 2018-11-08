@@ -272,7 +272,8 @@ class PeerConnection : public PeerConnectionInternal,
   bool PauseFileStream(bool pause) override;
   bool SetFileStreamVolume(float volume) override;
   float GetFileStreamVolume() override;
-  void SetPlayCallback(PlayCallback* tick) override;
+  void AddPlayCallback(PlayCallback* tick) override;
+  void RemovePlayCallback(PlayCallback* tick) override;
   bool SetPlayTime(int64_t time) override;
   int64_t GetPlayTotalTime() override;
   bool IsPause() override;
