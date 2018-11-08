@@ -11,6 +11,8 @@
 #include "modules/desktop_capture/win/lyric_render.h"
 #include <list>
 #include <string>
+#include <fstream>  
+#include <streambuf> 
 #include "api/video/i420_buffer.h"
 #include "api/video/video_frame.h"
 #include "modules/audio_device/include/audio_file_playback.h"
@@ -23,6 +25,7 @@
 #include "rtc_base/stringutils.h"
 #include "third_party/libyuv/include/libyuv/convert_argb.h"
 #include "third_party/libyuv/include/libyuv/convert_from_argb.h"
+#include "third_party/zlib/zlib.h"
 
 namespace webrtc {
 
@@ -33,7 +36,10 @@ class LyricRender : public LyricRenderInterface {
 
   // LyricRenderInterface
   bool SetLyric(const std::string& lyric) override;
+  bool SetKrcLyric(const std::string& file) override;
   bool MaskFrame(const VideoFrame& frame) override;
+  void SetDisplay(bool display) override;
+  bool IsDisplay() override;
 
  protected:
   // PlayCallback
@@ -55,6 +61,7 @@ class LyricRender : public LyricRenderInterface {
   LyricLine* _playline = NULL;
   LyricLine* _nextline = NULL;
   uint32_t _played_length = 0;
+  volatile bool _display = true;
 
   uint32_t _xoffset = 10;
   uint32_t _yoffset = 10;
@@ -97,8 +104,96 @@ bool LyricRender::SetLyric(const std::string& lyrictext) {
   return _lyrc_prase.Prase(lyrictext);
 }
 
+std::string UTF8_To_string(const std::string& str) {
+  int nwLen = MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, NULL, 0);
+
+  wchar_t* pwBuf = new wchar_t[nwLen + 1];  //一定要加1，不然会出现尾巴
+  memset(pwBuf, 0, nwLen * 2 + 2);
+
+  MultiByteToWideChar(CP_UTF8, 0, str.c_str(), str.length(), pwBuf, nwLen);
+
+  int nLen = WideCharToMultiByte(CP_ACP, 0, pwBuf, -1, NULL, NULL, NULL, NULL);
+
+  char* pBuf = new char[nLen + 1];
+  memset(pBuf, 0, nLen + 1);
+
+  WideCharToMultiByte(CP_ACP, 0, pwBuf, nwLen, pBuf, nLen, NULL, NULL);
+
+  std::string retStr = pBuf;
+
+  delete[] pBuf;
+  delete[] pwBuf;
+
+  pBuf = NULL;
+  pwBuf = NULL;
+
+  return retStr;
+}
+
+static const unsigned char KrcKeys[] = {64, 71, 97, 119, 94,  50,  116, 71,
+                              81, 54, 49, 45,  206, 210, 110, 105};
+
+bool LyricRender::SetKrcLyric(const std::string& file) {
+  FILE* pFile = fopen(file.c_str(), "rb");
+  if (pFile == NULL) {
+    RTC_LOG(LERROR) << "File error";
+    return false;
+  }
+
+  /* 获取文件大小 */
+  fseek(pFile, 0, SEEK_END);
+  long lSize = ftell(pFile);
+  rewind(pFile);
+
+  /* 分配内存存储整个文件 */
+  char* buffer = new char[lSize];
+  if (buffer == NULL) {
+    fclose(pFile);
+    RTC_LOG(LERROR) << "Memory error";
+    return false;
+  }
+
+  /* 将文件拷贝到buffer中 */
+  size_t result = fread(buffer, 1, lSize, pFile);
+  if (result != (size_t)lSize) {
+    fclose(pFile);
+    RTC_LOG(LERROR) << "Reading error";
+    return false;
+  }
+
+  fclose(pFile);
+
+  if (strncmp(buffer, "krc1", 4) != 0) {
+    delete[] buffer;
+    return false;
+  }
+  unsigned char* krcData = (unsigned char *)(buffer + 4);
+  long krcDataLen = lSize - 4;
+
+  // XOR 大法解码
+  for (long i = 0; i < krcDataLen; i++) {
+    krcData[i] ^= KrcKeys[i % 16];
+  }
+
+  unsigned long decodeLen = compressBound(krcDataLen * 3);
+  unsigned char* decodeData = new unsigned char[decodeLen];
+
+  if (uncompress(decodeData, &decodeLen, krcData, krcDataLen) != Z_OK) {
+    delete[] buffer;
+    delete[] decodeData;
+    return false;
+  }
+
+  bool ret = _lyrc_prase.Prase(UTF8_To_string(std::string((char*)decodeData)));
+
+  delete[] buffer;
+  delete[] decodeData;
+
+  return ret;
+}
+
 bool LyricRender::MaskFrame(const VideoFrame& frame) {
-  if (_playline == NULL) {
+  if (_playline == NULL || !_display) {
     return false;
   }
 
@@ -187,6 +282,9 @@ void LyricRender::RenderLine(LyricLine* line,
 }
 
 void LyricRender::OnPlayTimer(int64_t cur, int64_t total) {
+  if (!_display) {
+    return;
+  }
   //获取字体数据
   uint64_t curtime = (uint64_t)cur;
 
@@ -259,5 +357,13 @@ void LyricRender::OnPlayStart(bool start) {
 }
 
 void LyricRender::OnPlayPause(bool pause) {}
+
+void LyricRender::SetDisplay(bool display) {
+  _display = display;
+}
+
+bool LyricRender::IsDisplay() {
+  return _display;
+}
 
 }  // namespace webrtc

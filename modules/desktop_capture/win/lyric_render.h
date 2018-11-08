@@ -12,9 +12,9 @@
 #define MODULES_DESKTOP_CAPTURE_WIN_LYRIC_RENDER_H_
 
 #include <string>
+#include "modules/audio_device/include/audio_file_playback.h"
 #include "rtc_base/refcount.h"
 #include "rtc_base/scoped_ref_ptr.h"
-#include "modules/audio_device/include/audio_file_playback.h"
 
 namespace webrtc {
 
@@ -27,7 +27,10 @@ class LyricRenderInterface : public PlayCallback {
 
  public:
   virtual bool SetLyric(const std::string& lyric) = 0;
+  virtual bool SetKrcLyric(const std::string& file) = 0;
   virtual bool MaskFrame(const VideoFrame& frame) = 0;
+  virtual void SetDisplay(bool display) = 0;
+  virtual bool IsDisplay() = 0;
 };
 
 }  // namespace webrtc

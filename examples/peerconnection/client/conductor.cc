@@ -53,11 +53,14 @@ class DummySetSessionDescriptionObserver
 
 Conductor::Conductor(PeerConnectionClient* client, MainWindow* main_wnd)
     : peer_id_(-1), loopback_(false), client_(client), main_wnd_(main_wnd) {
+  lyric = webrtc::LyricRenderInterface::Create();
   client_->RegisterObserver(this);
   main_wnd->RegisterObserver(this);
 }
 
 Conductor::~Conductor() {
+  if (lyric != NULL)
+    free(lyric);
   RTC_DCHECK(!peer_connection_);
 }
 
@@ -584,32 +587,6 @@ void Conductor::UIThreadCallback(int msg_id, void* data) {
   }
 }
 
-std::string UTF8_To_string(const std::string& str) {
-  int nwLen = MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, NULL, 0);
-
-  wchar_t* pwBuf = new wchar_t[nwLen + 1];  //一定要加1，不然会出现尾巴
-  memset(pwBuf, 0, nwLen * 2 + 2);
-
-  MultiByteToWideChar(CP_UTF8, 0, str.c_str(), str.length(), pwBuf, nwLen);
-
-  int nLen = WideCharToMultiByte(CP_ACP, 0, pwBuf, -1, NULL, NULL, NULL, NULL);
-
-  char* pBuf = new char[nLen + 1];
-  memset(pBuf, 0, nLen + 1);
-
-  WideCharToMultiByte(CP_ACP, 0, pwBuf, nwLen, pBuf, nLen, NULL, NULL);
-
-  std::string retStr = pBuf;
-
-  delete[] pBuf;
-  delete[] pwBuf;
-
-  pBuf = NULL;
-  pwBuf = NULL;
-
-  return retStr;
-}
-
 void Conductor::OnSuccess(webrtc::SessionDescriptionInterface* desc) {
   peer_connection_->SetLocalDescription(
       DummySetSessionDescriptionObserver::Create(), desc);
@@ -617,21 +594,11 @@ void Conductor::OnSuccess(webrtc::SessionDescriptionInterface* desc) {
   peer_connection_->AddPlayCallback(this);
   peer_connection_->AddFileStream(std::string("F://bucai.pcm"));
 
-  lyric = webrtc::LyricRenderInterface::Create();
+  char path[] = "F://KuGou/Lyric/222.krc";
 
-  char path[] = "F://bucai.lrc";
-  FILE* p = NULL;
-  p = fopen(path, "r");
-  if (p == NULL) {
-    return;
-  }
-
-  std::string text;
-  char tmp[1024] = {0};
-  while (fgets(tmp, 1024, p) != NULL) {
-    text.append(tmp);
-  }
-  lyric->SetLyric(UTF8_To_string(text));
+  lyric->SetKrcLyric(path);
+//   lyric->SetDisplay(false);
+//   lyric->SetDisplay(true);
 
   capture->AddOrUpdateLyric(lyric);
   peer_connection_->AddPlayCallback(lyric);
