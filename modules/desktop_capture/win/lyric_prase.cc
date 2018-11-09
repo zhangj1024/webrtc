@@ -174,19 +174,39 @@ void LyricLine::PraseBitmapGlyph(FT_Face& pFTFace) {
   }
 }
 
+std::string GetExePath(void) {
+  char szFilePath[MAX_PATH + 1] = {0};
+  GetModuleFileNameA(NULL, szFilePath, MAX_PATH);
+  char* p = strrchr(szFilePath, '\\');
+  if (p)
+    *p = 0;  // 删除文件名，只获得路径字串
+
+  for (size_t i = 0; i < sizeof(szFilePath); i++) {
+    if (szFilePath[i] == '\\') {
+      szFilePath[i] = '/';
+    }
+  }
+
+  return szFilePath;
+}
+
 LyricPrase::LyricPrase() {
   if (FT_Init_FreeType(&pFTLib)) {
     pFTLib = NULL;
     RTC_LOG(LS_ERROR) << "Failed to Init FreeType";
     return;
   }
+
+  std::string exepath = GetExePath();
+  exepath.append("/Fonts/simhei.ttf");
+
   //从字体文件创建face，simhei.ttf是黑体
-  if (FT_New_Face(pFTLib, "C:/Windows/Fonts/simhei.ttf", 0, &pFTFace)) {
+  if (FT_New_Face(pFTLib, exepath.c_str(), 0, &pFTFace)) {
     pFTFace = NULL;
     RTC_LOG(LS_ERROR) << "Failed to open F://FreeSerif.ttf";
     return;
   }
-  FT_Set_Char_Size(pFTFace, 0, 16 * 64, 300, 300);  //设置字体大小
+  FT_Set_Char_Size(pFTFace, 0, 16 * 64, 200, 200);  //设置字体大小
   // FT_Set_Pixel_Sizes(pFTFace,0,16 );
 }
 

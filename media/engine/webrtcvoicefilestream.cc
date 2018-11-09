@@ -141,6 +141,8 @@ void WebRtcVoiceFileStream::Stop() {
     return;
   }
 
+  SetPause(false);
+
   {
     rtc::CritScope critScoped(&_critSect);
     _inputFile.CloseFile();
@@ -152,8 +154,6 @@ void WebRtcVoiceFileStream::Stop() {
       playing_ = false;
       return;
     }
-
-    SetPause(false);
 
     // stop the driving thread...
     RTC_LOG(LS_VERBOSE)
@@ -277,6 +277,10 @@ bool WebRtcVoiceFileStream::FileThreadProcess() {
         break;
     }
 
+    if (!keepPlaying) {
+      break;
+    }
+
     if (audio_frame_list_player_.size() >= 5) {
       continue;
     }
@@ -322,7 +326,6 @@ void WebRtcVoiceFileStream::SetPause(bool pause) {
   } else {
     SetEvent(_hPauseEvent);
   }
-  RTC_LOG(LS_WARNING) << "Unknown wait termination on capture side";
 
   for (auto tick : ticks_) {
     tick->OnPlayPause(pause_);
