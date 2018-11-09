@@ -21,7 +21,6 @@
 #include FT_FREETYPE_H
 #include FT_GLYPH_H
 #include "modules/desktop_capture/win/lyric_prase.h"
-#include "rtc_base/criticalsection.cc"
 #include "rtc_base/stringutils.h"
 #include "third_party/libyuv/include/libyuv/convert_argb.h"
 #include "third_party/libyuv/include/libyuv/convert_from_argb.h"
@@ -107,7 +106,7 @@ bool LyricRender::SetLyric(const std::string& lyrictext) {
 std::string UTF8_To_string(const std::string& str) {
   int nwLen = MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, NULL, 0);
 
-  wchar_t* pwBuf = new wchar_t[nwLen + 1];  //Ò»¶¨Òª¼Ó1£¬²»È»»á³öÏÖÎ²°Í
+  wchar_t* pwBuf = new wchar_t[nwLen + 1];  //ä¸€å®šè¦åŠ 1ï¼Œä¸ç„¶ä¼šå‡ºç°å°¾å·´
   memset(pwBuf, 0, nwLen * 2 + 2);
 
   MultiByteToWideChar(CP_UTF8, 0, str.c_str(), str.length(), pwBuf, nwLen);
@@ -140,12 +139,12 @@ bool LyricRender::SetKrcLyric(const std::string& file) {
     return false;
   }
 
-  /* »ñÈ¡ÎÄ¼ş´óĞ¡ */
+  /* è·å–æ–‡ä»¶å¤§å° */
   fseek(pFile, 0, SEEK_END);
   long lSize = ftell(pFile);
   rewind(pFile);
 
-  /* ·ÖÅäÄÚ´æ´æ´¢Õû¸öÎÄ¼ş */
+  /* åˆ†é…å†…å­˜å­˜å‚¨æ•´ä¸ªæ–‡ä»¶ */
   char* buffer = new char[lSize];
   if (buffer == NULL) {
     fclose(pFile);
@@ -153,7 +152,7 @@ bool LyricRender::SetKrcLyric(const std::string& file) {
     return false;
   }
 
-  /* ½«ÎÄ¼ş¿½±´µ½bufferÖĞ */
+  /* å°†æ–‡ä»¶æ‹·è´åˆ°bufferä¸­ */
   size_t result = fread(buffer, 1, lSize, pFile);
   if (result != (size_t)lSize) {
     fclose(pFile);
@@ -170,7 +169,7 @@ bool LyricRender::SetKrcLyric(const std::string& file) {
   unsigned char* krcData = (unsigned char *)(buffer + 4);
   long krcDataLen = lSize - 4;
 
-  // XOR ´ó·¨½âÂë
+  // XOR å¤§æ³•è§£ç 
   for (long i = 0; i < krcDataLen; i++) {
     krcData[i] ^= KrcKeys[i % 16];
   }
@@ -248,7 +247,7 @@ void LyricRender::RenderLine(LyricLine* line,
       FT_BitmapGlyph bitmap_glyph = (FT_BitmapGlyph)glyph;
       FT_Bitmap& bitmap = bitmap_glyph->bitmap;
 
-      //Ã¿¸ö×ÖµÄ¸ß¶È²»Ò»Ñù£¬ÒÑµ×ÏßÎª×¼
+      //æ¯ä¸ªå­—çš„é«˜åº¦ä¸ä¸€æ ·ï¼Œå·²åº•çº¿ä¸ºå‡†
       int yindex = yoffset + it->glyph_height_offsets.at(glyph_index);
 
       for (uint32_t i = 0; i < bitmap.rows; i++) {
@@ -285,7 +284,7 @@ void LyricRender::OnPlayTimer(int64_t cur, int64_t total) {
   if (!_display) {
     return;
   }
-  //»ñÈ¡×ÖÌåÊı¾İ
+  //è·å–å­—ä½“æ•°æ®
   uint64_t curtime = (uint64_t)cur;
 
   if (curtime < _lyrc_prase._offset) {
@@ -323,8 +322,8 @@ void LyricRender::OnPlayTimer(int64_t cur, int64_t total) {
     for (auto glyphitr = lineitr->glyphs.begin();
          glyphitr != lineitr->glyphs.end(); glyphitr++) {
       FT_BitmapGlyph bitmap_glyph = (FT_BitmapGlyph)*glyphitr;
-      RTC_LOG(LS_ERROR) << lineitr->_word
-                        << " width:" << bitmap_glyph->bitmap.width;
+//       RTC_LOG(LS_ERROR) << lineitr->_word
+//                         << " width:" << bitmap_glyph->bitmap.width;
       word_length += bitmap_glyph->bitmap.width;
       if (glyphitr != lineitr->glyphs.begin()) {
         played_length += _xspace;
@@ -344,8 +343,8 @@ void LyricRender::OnPlayTimer(int64_t cur, int64_t total) {
     }
   }
 
-  RTC_LOG(LS_ERROR) << "curtime:" << curtime
-                    << " played_length:" << played_length;
+//   RTC_LOG(LS_ERROR) << "curtime:" << curtime
+//                     << " played_length:" << played_length;
 
   _played_length = played_length;
 }
