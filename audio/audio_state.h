@@ -70,8 +70,8 @@ class AudioState final : public webrtc::AudioState {
 
   void UpdateAudioTransportWithSendingStreams();
 
-  void InitRecording();
-  void InitPlayout();
+  void InitAndStartRecording();
+  void InitAndStartPlayout();
 
   rtc::ThreadChecker thread_checker_;
   rtc::ThreadChecker process_thread_checker_;

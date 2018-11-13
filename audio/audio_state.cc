@@ -16,12 +16,12 @@
 
 #include "absl/memory/memory.h"
 #include "audio/audio_receive_stream.h"
+#include "media/engine/webrtcvoicefilestream.h"
 #include "modules/audio_device/include/audio_device.h"
 #include "rtc_base/atomicops.h"
 #include "rtc_base/checks.h"
 #include "rtc_base/logging.h"
 #include "rtc_base/thread.h"
-#include "media/engine/webrtcvoicefilestream.h"
 
 namespace webrtc {
 namespace internal {
@@ -65,7 +65,7 @@ void AudioState::AddReceivingStream(webrtc::AudioReceiveStream* stream) {
     RTC_DLOG(LS_ERROR) << "Failed to add source to mixer.";
   }
 
-  InitPlayout();
+  InitAndStartPlayout();
 }
 
 void AudioState::RemoveReceivingStream(webrtc::AudioReceiveStream* stream) {
@@ -75,6 +75,14 @@ void AudioState::RemoveReceivingStream(webrtc::AudioReceiveStream* stream) {
   config_.audio_mixer->RemoveSource(
       static_cast<internal::AudioReceiveStream*>(stream));
   if (receiving_streams_.empty()) {
+    if (config_.audio_device_module->BuiltInAECIsAvailable()) {
+      if (sending_streams_.empty()) {
+        config_.audio_device_module->StopRecording();
+      } else {
+        return;
+      }
+    }
+
     config_.audio_device_module->StopPlayout();
   }
 }
@@ -88,7 +96,7 @@ void AudioState::AddSendingStream(webrtc::AudioSendStream* stream,
   properties.num_channels = num_channels;
   UpdateAudioTransportWithSendingStreams();
 
-  InitRecording();
+  InitAndStartRecording();
 }
 
 void AudioState::RemoveSendingStream(webrtc::AudioSendStream* stream) {
@@ -98,13 +106,18 @@ void AudioState::RemoveSendingStream(webrtc::AudioSendStream* stream) {
   UpdateAudioTransportWithSendingStreams();
   if (sending_streams_.empty()) {
     config_.audio_device_module->StopRecording();
+    if (config_.audio_device_module->BuiltInAECIsAvailable()) {
+      if (receiving_streams_.empty()) {
+        config_.audio_device_module->StopPlayout();
+      }
+    }
   }
 }
 
 void AudioState::AddFileStream(webrtc::WebRtcVoiceFileStream* stream) {
   RTC_DCHECK(thread_checker_.CalledOnValidThread());
 
-//   receiving_streams_.insert((webrtc::AudioReceiveStream*)stream);
+  //   receiving_streams_.insert((webrtc::AudioReceiveStream*)stream);
   if (!config_.audio_mixer->AddSource(stream->GetPlaySource())) {
     RTC_DLOG(LS_ERROR) << "Failed to add source to mixer.";
   }
@@ -113,18 +126,18 @@ void AudioState::AddFileStream(webrtc::WebRtcVoiceFileStream* stream) {
     RTC_DLOG(LS_ERROR) << "Failed to add source to record_audio_mixer.";
   }
 
-  InitPlayout();
-  InitRecording();
+  InitAndStartPlayout();
+  InitAndStartRecording();
 
   this->audio_transport_.RegisterTickCallback((AudioTick*)stream);
 }
 
 void AudioState::RemoveFileStream(webrtc::WebRtcVoiceFileStream* stream) {
   RTC_DCHECK(thread_checker_.CalledOnValidThread());
-//   receiving_streams_.erase((webrtc::AudioReceiveStream*)stream);
-//   if (receiving_streams_.empty()) {
-//     config_.audio_device_module->StopPlayout();
-//   }
+  //   receiving_streams_.erase((webrtc::AudioReceiveStream*)stream);
+  //   if (receiving_streams_.empty()) {
+  //     config_.audio_device_module->StopPlayout();
+  //   }
 
   config_.audio_mixer->RemoveSource(stream->GetPlaySource());
   config_.record_audio_mixer->RemoveSource(stream->GetRecordSource());
@@ -143,6 +156,14 @@ void AudioState::SetPlayout(bool enabled) {
         config_.audio_device_module->StartPlayout();
       }
     } else {
+      if (config_.audio_device_module->BuiltInAECIsAvailable()) {
+        if (sending_streams_.empty()) {
+          config_.audio_device_module->StopRecording();
+        } else {
+          playout_enabled_ = true;
+          return;
+        }
+      }
       config_.audio_device_module->StopPlayout();
       null_audio_poller_ =
           absl::make_unique<NullAudioPoller>(&audio_transport_);
@@ -157,6 +178,12 @@ void AudioState::SetRecording(bool enabled) {
     recording_enabled_ = enabled;
     if (enabled) {
       if (!sending_streams_.empty()) {
+        if (config_.audio_device_module->BuiltInAECIsAvailable()) {
+          InitAndStartPlayout();
+          null_audio_poller_.reset();
+          playout_enabled_ = true;
+        }
+
         config_.audio_device_module->StartRecording();
       }
     } else {
@@ -209,12 +236,15 @@ void AudioState::UpdateAudioTransportWithSendingStreams() {
   audio_transport_.UpdateSendingStreams(std::move(sending_streams),
                                         max_sample_rate_hz, max_num_channels);
 }
-void AudioState::InitRecording() {
+void AudioState::InitAndStartRecording() {
   // Make sure recording is initialized; start recording if enabled.
   auto* adm = config_.audio_device_module.get();
   if (!adm->Recording()) {
     if (adm->InitRecording() == 0) {
       if (recording_enabled_) {
+        if (adm->BuiltInAECIsAvailable()) {
+          InitAndStartPlayout();
+        }
         adm->StartRecording();
       }
     } else {
@@ -222,7 +252,7 @@ void AudioState::InitRecording() {
     }
   }
 }
-void AudioState::InitPlayout() {
+void AudioState::InitAndStartPlayout() {
   // Make sure playback is initialized; start playing if enabled.
   auto* adm = config_.audio_device_module.get();
   if (!adm->Playing()) {
