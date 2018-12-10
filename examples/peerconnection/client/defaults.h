@@ -26,7 +26,7 @@ std::string GetPeerConnectionString();
 std::string GetDefaultServerName();
 std::string GetPeerName();
 
-#define TestScreen	1
+#define TestScreen	0
 #define TestWindow	0
 #define TestCursor	0
 #define TestMute	0

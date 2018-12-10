@@ -21,16 +21,16 @@ extern const uint16_t kDefaultServerPort;  // From defaults.[h|cc]
 
 DEFINE_bool(help, false, "Prints this message");
 DEFINE_bool(autoconnect,
-            true,
+            false,
             "Connect to the server without user "
             "intervention.");
-DEFINE_string(server, "192.168.1.11", "The server to connect to.");
+DEFINE_string(server, "localhost", "The server to connect to.");
 DEFINE_int(port,
            kDefaultServerPort,
            "The port on which the server is listening.");
 DEFINE_bool(
     autocall,
-    true,
+    false,
     "Call the first available other client on "
     "the server without user intervention.  Note: this flag should only be set "
     "to true on one of the two clients.");

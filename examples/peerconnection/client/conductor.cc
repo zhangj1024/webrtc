@@ -591,17 +591,17 @@ void Conductor::OnSuccess(webrtc::SessionDescriptionInterface* desc) {
   peer_connection_->SetLocalDescription(
       DummySetSessionDescriptionObserver::Create(), desc);
 
-  peer_connection_->AddPlayCallback(this);
-  peer_connection_->AddFileStream(std::string("F://bucai.pcm"));
+//   peer_connection_->AddPlayCallback(this);
+//   peer_connection_->AddFileStream(std::string("F://bucai.pcm"));
 
-  char path[] = "F://KuGou/Lyric/222.krc";
+//   char path[] = "F://KuGou/Lyric/222.krc";
 
-  lyric->SetKrcLyric(path);
+//   lyric->SetKrcLyric(path);
 //   lyric->SetDisplay(false);
 //   lyric->SetDisplay(true);
 
-  capture->AddOrUpdateLyric(lyric);
-  peer_connection_->AddPlayCallback(lyric);
+//   capture->AddOrUpdateLyric(lyric);
+//   peer_connection_->AddPlayCallback(lyric);
   //   peer_connection_->PauseFileStream(true);
   //   peer_connection_->PauseFileStream(false);
 //   peer_connection_->SetPlayTime(260 * 1000);
