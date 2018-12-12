@@ -53,6 +53,7 @@
 #include "system_wrappers/include/clock.h"
 #include "system_wrappers/include/field_trial.h"
 #include "system_wrappers/include/metrics.h"
+#include "media/engine/webrtcrecord.h"
 
 using cricket::ContentInfo;
 using cricket::ContentInfos;
@@ -6426,5 +6427,21 @@ bool PeerConnection::IsPlaying() {
   return false;
 }
 
+void PeerConnection::StartRecord() {
+  worker_thread()->Invoke<void>(RTC_FROM_HERE, [this] {
+    if (record == NULL) {
+      record = call_->CreateRecord();
+    }
+    record->Start();
+  });
+}
+
+void PeerConnection::StopRecord() {
+  worker_thread()->Invoke<void>(RTC_FROM_HERE, [this] {
+    if (record != NULL) {
+      call_->DestroyRecord(record);
+    }
+  });
+}
 
 }  // namespace webrtc

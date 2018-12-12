@@ -63,9 +63,14 @@ class AudioState final : public webrtc::AudioState {
   void AddFileStream(webrtc::WebRtcVoiceFileStream* stream);
   void RemoveFileStream(webrtc::WebRtcVoiceFileStream* stream);
 
- private:
-  // rtc::RefCountInterface implementation.
-  void AddRef() const override;
+  void AddPlayerAudioSink(webrtc::AudioSinkInterface* skin);
+  void RemovePlayerAudioSink(webrtc::AudioSinkInterface* skin);
+  void AddRecordAudioSink(webrtc::AudioSinkInterface* skin);
+  void RemoveRecordAudioSink(webrtc::AudioSinkInterface* skin);
+
+private :
+      // rtc::RefCountInterface implementation.
+      void AddRef() const override;
   rtc::RefCountReleaseStatus Release() const override;
 
   void UpdateAudioTransportWithSendingStreams();

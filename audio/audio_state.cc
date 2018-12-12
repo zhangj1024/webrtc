@@ -145,6 +145,26 @@ void AudioState::RemoveFileStream(webrtc::WebRtcVoiceFileStream* stream) {
   this->audio_transport_.RegisterTickCallback(NULL);
 }
 
+void AudioState::AddPlayerAudioSink(webrtc::AudioSinkInterface* skin) {
+  RTC_DCHECK(thread_checker_.CalledOnValidThread());
+  this->audio_transport_.SetPlayerAudioSkin(skin);
+}
+
+void AudioState::RemovePlayerAudioSink(webrtc::AudioSinkInterface* skin) {
+  RTC_DCHECK(thread_checker_.CalledOnValidThread());
+  this->audio_transport_.SetPlayerAudioSkin(NULL);
+}
+
+void AudioState::AddRecordAudioSink(webrtc::AudioSinkInterface* skin) {
+  RTC_DCHECK(thread_checker_.CalledOnValidThread());
+  this->audio_transport_.SetRecordAudioSkin(skin);
+}
+
+void AudioState::RemoveRecordAudioSink(webrtc::AudioSinkInterface* skin) {
+  RTC_DCHECK(thread_checker_.CalledOnValidThread());
+  this->audio_transport_.SetRecordAudioSkin(NULL);
+}
+
 void AudioState::SetPlayout(bool enabled) {
   RTC_LOG(INFO) << "SetPlayout(" << enabled << ")";
   RTC_DCHECK(thread_checker_.CalledOnValidThread());

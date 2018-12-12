@@ -29,6 +29,7 @@ namespace webrtc {
 
 class AudioSendStream;
 class InternalAudioSource;
+class AudioSinkInterface;
 
 class AudioTransportImpl : public AudioTransport {
  public:
@@ -75,6 +76,9 @@ class AudioTransportImpl : public AudioTransport {
   bool typing_noise_detected() const;
   const voe::AudioLevel& audio_level() const { return audio_level_; }
 
+  void SetPlayerAudioSkin(AudioSinkInterface* audio_sink);
+  void SetRecordAudioSkin(AudioSinkInterface* audio_sink);
+
  private:
   // Shared.
   AudioProcessing* audio_processing_ = nullptr;
@@ -90,7 +94,13 @@ class AudioTransportImpl : public AudioTransport {
   voe::AudioLevel audio_level_;
   TypingDetection typing_detection_;
 
+  rtc::CriticalSection record_skin_lock_;
+  AudioSinkInterface* record_sink_ = nullptr;
+
   // Render side.
+  rtc::CriticalSection player_skin_lock_;
+  AudioSinkInterface* player_sink_ = nullptr;
+
   rtc::scoped_refptr<AudioMixer> play_mixer_;
   AudioFrame play_mixed_frame_;
   // Converts mixed audio to the audio device output rate.

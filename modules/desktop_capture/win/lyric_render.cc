@@ -309,7 +309,7 @@ void LyricRender::OnPlayTimer(int64_t cur, int64_t total) {
     }
   }
 
-  if (curtime < _playline->_offset) {
+  if (_playline == NULL || curtime < _playline->_offset) {
     _played_length = 0;
     return;
   }

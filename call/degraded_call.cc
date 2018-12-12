@@ -138,6 +138,14 @@ void DegradedCall::DestroyFileStream(webrtc::AudioReceiveStream* file_stream) {
   call_->DestroyFileStream(file_stream);
 }
 
+webrtc::WebRtcAudioMixForRecord* DegradedCall::CreateRecord() {
+  return call_->CreateRecord();
+}
+
+void DegradedCall::DestroyRecord(webrtc::WebRtcAudioMixForRecord* record) {
+  call_->DestroyRecord(record);
+}
+
 PacketReceiver* DegradedCall::Receiver() {
   if (receive_config_) {
     return this;

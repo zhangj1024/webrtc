@@ -592,9 +592,9 @@ void Conductor::OnSuccess(webrtc::SessionDescriptionInterface* desc) {
       DummySetSessionDescriptionObserver::Create(), desc);
 
 //   peer_connection_->AddPlayCallback(this);
-//   peer_connection_->AddFileStream(std::string("F://bucai.pcm"));
+  peer_connection_->AddFileStream(std::string("F://bucai.pcm"));
 
-//   char path[] = "F://KuGou/Lyric/222.krc";
+//   char path[] = "F://bucai.krc";
 
 //   lyric->SetKrcLyric(path);
 //   lyric->SetDisplay(false);
@@ -602,14 +602,14 @@ void Conductor::OnSuccess(webrtc::SessionDescriptionInterface* desc) {
 
 //   capture->AddOrUpdateLyric(lyric);
 //   peer_connection_->AddPlayCallback(lyric);
-  //   peer_connection_->PauseFileStream(true);
-  //   peer_connection_->PauseFileStream(false);
+//   peer_connection_->PauseFileStream(true);
+//   peer_connection_->PauseFileStream(false);
 //   peer_connection_->SetPlayTime(260 * 1000);
-  //   RTC_LOG(LS_ERROR) << "GetPlayTotalTime:" <<
-  //   peer_connection_->GetPlayTotalTime();
-  //
-  //   static const float volume = 0.5;
-  //   peer_connection_->SetFileStreamVolume(volume * volume * volume);
+//   RTC_LOG(LS_ERROR) << "GetPlayTotalTime:" <<
+//   peer_connection_->GetPlayTotalTime();
+//
+//   static const float volume = 0.5;
+//   peer_connection_->SetFileStreamVolume(volume * volume * volume);
 
   std::string sdp;
   desc->ToString(&sdp);

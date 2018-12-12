@@ -12,6 +12,7 @@
 #include "audio/audio_state.h"
 #include "audio/remix_resample.h"
 #include "audio/utility/audio_frame_operations.h"
+#include "media/engine/webrtcinternalfileaudiosource.h"
 #include "rtc_base/bind.h"
 #include "rtc_base/thread_checker.h"
 #include "system_wrappers/include/sleep.h"
@@ -28,47 +29,6 @@ static const int64_t datalenIn10Ms =
     kRecordingBufferSizeIn10Ms * sizeof(int16_t);
 
 namespace webrtc {
-
-class InternalFileAudioSource : public AudioMixer::Source {
- public:
-  InternalFileAudioSource(){};
-  AudioFrameInfo GetAudioFrameWithInfo(int sample_rate_hz,
-                                       AudioFrame* audio_frame) override {
-    if (!audio_data_) {
-      return AudioFrameInfo::kError;
-    }
-    if (audio_data_->muted()) {
-      return AudioFrameInfo::kMuted;
-    }
-
-    audio_frame->num_channels_ = audio_data_->num_channels_;
-    audio_frame->sample_rate_hz_ = sample_rate_hz;
-
-    voe::RemixAndResample(*audio_data_.get(), &capture_resampler_, audio_frame);
-    audio_data_ = NULL;
-    return AudioFrameInfo::kNormal;
-  }
-
-  // A way for a mixer implementation to distinguish participants.
-  int Ssrc() const override { return 0; }
-
-  // A way for this source to say that GetAudioFrameWithInfo called
-  // with this sample rate or higher will not cause quality loss.
-  int PreferredSampleRate() const override { return _sample_rate; }
-
-  void SetSampleRate(uint32_t sample_rate) { _sample_rate = sample_rate; }
-
-  ~InternalFileAudioSource() override { audio_data_ = NULL; }
-
-  void SetFrame(std::unique_ptr<AudioFrame> audio_data) {
-    audio_data_ = std::move(audio_data);
-  };
-
- private:
-  std::unique_ptr<AudioFrame> audio_data_;
-  PushResampler<int16_t> capture_resampler_;
-  uint32_t _sample_rate = 0;
-};
 
 WebRtcVoiceFileStream::WebRtcVoiceFileStream(
     const rtc::scoped_refptr<webrtc::AudioState>& audio_state,

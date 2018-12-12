@@ -14,6 +14,7 @@
 #include <memory>
 #include <utility>
 
+#include "api/call/audio_sink.h"
 #include "audio/remix_resample.h"
 #include "audio/utility/audio_frame_operations.h"
 #include "call/audio_send_stream.h"
@@ -191,6 +192,17 @@ int32_t AudioTransportImpl::RecordedDataIsAvailable(
     tick_->OnBeforeRecordData();
   }
 
+  {
+	// do not mix bgm, bgm mix in player
+    rtc::CritScope cs(&record_skin_lock_);
+    if (record_sink_) {
+      AudioSinkInterface::Data data(static_cast<const int16_t*>(audio_data),
+                                    number_of_frames, sample_rate,
+                                    number_of_channels, 0);
+      record_sink_->OnData(data);
+    }
+  }
+
   std::unique_ptr<AudioFrame> audio_frame(new AudioFrame());
 
   if (record_mixer_ && record_mixer_->SourceCnt() > 1) {
@@ -287,6 +299,15 @@ int32_t AudioTransportImpl::NeedMorePlayData(const size_t nSamples,
 
   nSamplesOut = Resample(play_mixed_frame_, samplesPerSec, &render_resampler_,
                          static_cast<int16_t*>(audioSamples));
+
+  rtc::CritScope cs(&player_skin_lock_);
+  if (player_sink_) {
+    AudioSinkInterface::Data data(static_cast<int16_t*>(audioSamples), nSamples,
+                                  samplesPerSec, nChannels,
+                                  play_mixed_frame_.timestamp_);
+    player_sink_->OnData(data);
+  }
+
   RTC_DCHECK_EQ(nSamplesOut, nChannels * nSamples);
   return 0;
 }
@@ -346,4 +367,15 @@ bool AudioTransportImpl::typing_noise_detected() const {
   rtc::CritScope lock(&capture_lock_);
   return typing_noise_detected_;
 }
+
+void AudioTransportImpl::SetPlayerAudioSkin(AudioSinkInterface* audio_sink) {
+  rtc::CritScope lock(&record_skin_lock_);
+  player_sink_ = audio_sink;
+}
+
+void AudioTransportImpl::SetRecordAudioSkin(AudioSinkInterface* audio_sink) {
+  rtc::CritScope lock(&player_skin_lock_);
+  record_sink_ = audio_sink;
+}
+
 }  // namespace webrtc
