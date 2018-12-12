@@ -147,6 +147,11 @@ PROXY_METHOD0(int64_t, GetPlayTotalTime)
 PROXY_METHOD0(bool, IsPause)
 PROXY_METHOD0(bool, IsPlaying)
 
+PROXY_METHOD1(bool, InitMix, AudioSinkInterface*)
+PROXY_METHOD0(void, StartMix)
+PROXY_METHOD0(void, StopMix)
+PROXY_METHOD0(bool, IsMixing)
+
 END_PROXY_MAP()
 
 }  // namespace webrtc

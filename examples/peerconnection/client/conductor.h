@@ -22,6 +22,7 @@
 #include "examples/peerconnection/client/main_wnd.h"
 #include "examples/peerconnection/client/peer_connection_client.h"
 #include "modules/audio_device/include/audio_file_playback.h"
+#include "api/call/audio_sink.h"
 
 namespace webrtc {
 class VideoCaptureModule;
@@ -36,7 +37,8 @@ class Conductor : public webrtc::PeerConnectionObserver,
                   public webrtc::CreateSessionDescriptionObserver,
                   public PeerConnectionClientObserver,
                   public MainWndCallback,
-	              public webrtc::PlayCallback {
+	              public webrtc::PlayCallback,
+                  public webrtc::AudioSinkInterface {
  public:
   enum CallbackID {
     MEDIA_CHANNELS_INITIALIZED = 1,
@@ -126,6 +128,9 @@ class Conductor : public webrtc::PeerConnectionObserver,
   void OnPlayTimer(int64_t cur, int64_t total) override;
   void OnPlayStart(bool start) override;
   void OnPlayPause(bool pause) override;
+
+  //AudioSinkInterface cb
+  void OnData(const Data& audio) override;
 
  protected:
   // Send a message to the remote peer.

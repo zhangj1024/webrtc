@@ -26,6 +26,7 @@
 #include "logging/rtc_event_log/icelogger.h"
 #include "logging/rtc_event_log/output/rtc_event_log_output_file.h"
 #include "logging/rtc_event_log/rtc_event_log.h"
+#include "media/engine/webrtcrecordplayermix.h"
 #include "media/sctp/sctptransport.h"
 #include "pc/audiotrack.h"
 #include "pc/channel.h"
@@ -53,7 +54,6 @@
 #include "system_wrappers/include/clock.h"
 #include "system_wrappers/include/field_trial.h"
 #include "system_wrappers/include/metrics.h"
-#include "media/engine/webrtcrecordplayermix.h"
 
 using cricket::ContentInfo;
 using cricket::ContentInfos;
@@ -186,8 +186,7 @@ void AddRtpSenderOptions(
       RTC_DCHECK(sender->media_type() == cricket::MEDIA_TYPE_VIDEO);
       if (video_media_description_options) {
         video_media_description_options->AddVideoSender(
-            sender->id(), sender->internal()->stream_ids(),
-            num_sim_layers);
+            sender->id(), sender->internal()->stream_ids(), num_sim_layers);
       }
     }
   }
@@ -6427,21 +6426,40 @@ bool PeerConnection::IsPlaying() {
   return false;
 }
 
-void PeerConnection::StartRecord() {
-  worker_thread()->Invoke<void>(RTC_FROM_HERE, [this] {
+bool PeerConnection::InitMix(AudioSinkInterface* cb) {
+  return worker_thread()->Invoke<bool>(RTC_FROM_HERE, [&]() {
     if (record == NULL) {
       record = call_->CreateRecord();
     }
-    record->Start();
+
+    if (record->IsRunning()) {
+      return false;
+    }
+    record->SetDataCallback(cb);
+    return true;
   });
 }
 
-void PeerConnection::StopRecord() {
+void PeerConnection::StartMix() {
   worker_thread()->Invoke<void>(RTC_FROM_HERE, [this] {
     if (record != NULL) {
+      record->Start();
+    }
+  });
+}
+
+void PeerConnection::StopMix() {
+  worker_thread()->Invoke<void>(RTC_FROM_HERE, [this] {
+    if (record != NULL) {
+      record->SetDataCallback(NULL);
       call_->DestroyRecord(record);
     }
   });
+}
+
+bool PeerConnection::IsMixing() {
+  return worker_thread()->Invoke<bool>(
+      RTC_FROM_HERE, [this] { return record ? record->IsRunning() : false; });
 }
 
 }  // namespace webrtc

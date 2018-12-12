@@ -280,8 +280,10 @@ class PeerConnection : public PeerConnectionInternal,
   bool IsPause() override;
   bool IsPlaying() override;
 
-  void StartRecord();
-  void StopRecord();
+  bool InitMix(AudioSinkInterface* cb) override;
+  void StartMix() override;
+  void StopMix() override;
+  bool IsMixing() override;
 
  protected:
   ~PeerConnection() override;

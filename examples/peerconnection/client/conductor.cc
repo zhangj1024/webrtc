@@ -611,6 +611,9 @@ void Conductor::OnSuccess(webrtc::SessionDescriptionInterface* desc) {
 //   static const float volume = 0.5;
 //   peer_connection_->SetFileStreamVolume(volume * volume * volume);
 
+//   peer_connection_->InitMix(this);
+//   peer_connection_->StartMix();
+
   std::string sdp;
   desc->ToString(&sdp);
 
@@ -652,4 +655,8 @@ void Conductor::OnPlayStart(bool start) {
 
 void Conductor::OnPlayPause(bool pause) {
   RTC_LOG(LERROR) << "OnPlayPause : " << pause;
+}
+
+void Conductor::OnData(const Data& audio) {
+	// audio mix frame
 }

@@ -29,6 +29,9 @@ class WebRtcRecordPlayerMix {
   void Start();
   void Stop();
 
+  void SetDataCallback(AudioSinkInterface* cb) { sink_mix_data_callback_ = cb; };
+  bool IsRunning();
+
  private:
   static DWORD WINAPI AudioMixThreadFunc(LPVOID context);
   bool AudioMixThreadProcess();
@@ -48,8 +51,11 @@ class WebRtcRecordPlayerMix {
   InternalFileAudioSource* playsource_;
   InternalFileAudioSource* recordsource_;
 
-  AudioSkin* skin_player_;
-  AudioSkin* skin_record_;
+  AudioSkin* sink_player_;
+  AudioSkin* sink_record_;
+
+  rtc::CriticalSection _critSectCb;
+  AudioSinkInterface* sink_mix_data_callback_;
 
   RTC_DISALLOW_IMPLICIT_CONSTRUCTORS(WebRtcRecordPlayerMix);
 };

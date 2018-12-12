@@ -1020,6 +1020,11 @@ class PeerConnectionInterface : public rtc::RefCountInterface {
   virtual bool IsPause() = 0;
   virtual bool IsPlaying() = 0;
 
+  virtual bool InitMix(AudioSinkInterface* cb) = 0;
+  virtual void StartMix() = 0;
+  virtual void StopMix() = 0;
+  virtual bool IsMixing() = 0;
+
  protected:
   // Dtor protected as objects shouldn't be deleted via this interface.
   ~PeerConnectionInterface() override = default;

@@ -18,10 +18,10 @@
 const int kRecordingFixedSampleRate = 48000;
 const size_t kRecordingNumChannels = 1;
 
-const size_t kRecordingFramesIn10MS =
-    static_cast<size_t>(kRecordingFixedSampleRate / 100);
-const size_t kRecordingBufferSizeIn10Ms =
-    kRecordingFramesIn10MS * kRecordingNumChannels;
+// const size_t kRecordingFramesIn10MS =
+//     static_cast<size_t>(kRecordingFixedSampleRate / 100);
+// const size_t kRecordingBufferSizeIn10Ms =
+//     kRecordingFramesIn10MS * kRecordingNumChannels;
 
 namespace webrtc {
 
@@ -78,8 +78,9 @@ WebRtcRecordPlayerMix::WebRtcRecordPlayerMix(
       worker_thread_(rtc::Thread::Current()),
       playsource_(new InternalFileAudioSource()),
       recordsource_(new InternalFileAudioSource()),
-      skin_player_(new AudioSkin()),
-      skin_record_(new AudioSkin()) {
+      sink_player_(new AudioSkin()),
+      sink_record_(new AudioSkin()),
+      sink_mix_data_callback_(NULL) {
   audio_mixer = webrtc::AudioMixerImpl::Create();
 
   if (!audio_mixer->AddSource(playsource_) ||
@@ -100,14 +101,14 @@ WebRtcRecordPlayerMix::~WebRtcRecordPlayerMix() {
 }
 
 void WebRtcRecordPlayerMix::Start() {
-  if (_hMixThread != NULL) {
+  if (sink_mix_data_callback_ == NULL || _hMixThread != NULL) {
     return;
   }
 
   {
     rtc::CritScope critScoped(&_critSect);
-    skin_player_->Reset();
-    skin_record_->Reset();
+    sink_player_->Reset();
+    sink_record_->Reset();
     audio_frame_list_mixed_.clear();
 
     // Create thread which will drive the rendering.
@@ -124,16 +125,16 @@ void WebRtcRecordPlayerMix::Start() {
 
   RTC_LOG(LS_INFO) << "Started mix for recording";
 
-  audio_state()->AddPlayerAudioSink(skin_player_);
-  audio_state()->AddRecordAudioSink(skin_record_);
+  audio_state()->AddPlayerAudioSink(sink_player_);
+  audio_state()->AddRecordAudioSink(sink_record_);
 }
 
 void WebRtcRecordPlayerMix::Stop() {
   {
     rtc::CritScope critScoped(&_critSect);
 
-    audio_state()->RemovePlayerAudioSink(skin_player_);
-    audio_state()->RemoveRecordAudioSink(skin_record_);
+    audio_state()->RemovePlayerAudioSink(sink_player_);
+    audio_state()->RemoveRecordAudioSink(sink_record_);
 
     if (_hMixThread == NULL) {
       RTC_LOG(LS_VERBOSE) << "no mix thread is active";
@@ -166,8 +167,8 @@ void WebRtcRecordPlayerMix::Stop() {
 
     CloseHandle(_hMixThread);
     _hMixThread = NULL;
-    skin_player_->Reset();
-    skin_record_->Reset();
+    sink_player_->Reset();
+    sink_record_->Reset();
     audio_frame_list_mixed_.clear();
   }
 }
@@ -200,10 +201,10 @@ bool WebRtcRecordPlayerMix::AudioMixThreadProcess() {
       break;
   }
 
-  FileWrapper pcmFile = FileWrapper::Open("F://mix.pcm", false);
+  //   FileWrapper pcmFile = FileWrapper::Open("F://mix.pcm", false);
 
   int64_t _lastCallRecordMillis = rtc::TimeMillis();
-
+  uint32_t ts = 0;  // ms
   while (keepMix) {
     int64_t currentTime = rtc::TimeMillis();
 
@@ -234,18 +235,35 @@ bool WebRtcRecordPlayerMix::AudioMixThreadProcess() {
     {
       rtc::CritScope lock(&_critSect);
 
-      recordsource_->SetFrame(skin_record_->GetFrame());
-      playsource_->SetFrame(skin_player_->GetFrame());
+      recordsource_->SetFrame(sink_record_->GetFrame());
+      playsource_->SetFrame(sink_player_->GetFrame());
     }
     AudioFrame* audio_frame = new AudioFrame();
     audio_mixer->Mix(kRecordingNumChannels, audio_frame);
+    audio_frame->timestamp_ = ts;
+    ts += 10;
 
-    pcmFile.Write(audio_frame->data(),
-                  kRecordingBufferSizeIn10Ms * sizeof(int16_t));
+    AudioSinkInterface::Data data(
+        static_cast<const int16_t*>(audio_frame->data()),
+        audio_frame->samples_per_channel_, audio_frame->sample_rate_hz_,
+        audio_frame->num_channels_, audio_frame->timestamp_);
+
+    rtc::CritScope lock(&_critSectCb);
+    if (sink_mix_data_callback_ == NULL)
+      break;
+
+    sink_mix_data_callback_->OnData(data);
+    //   pcmFile.Write(audio_frame->data(), kRecordingBufferSizeIn10Ms *
+    //   sizeof(int16_t));
   }
 
-  pcmFile.CloseFile();
+  //   pcmFile.CloseFile();
   return true;
+}
+
+bool WebRtcRecordPlayerMix::IsRunning() {
+  rtc::CritScope lock(&_critSect);
+  return _hMixThread != NULL;
 }
 
 }  // namespace webrtc
