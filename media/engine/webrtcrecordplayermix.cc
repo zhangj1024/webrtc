@@ -1,4 +1,4 @@
-#include "webrtcrecord.h"
+#include "webrtcrecordplayermix.h"
 
 /*
  *  Copyright (c) 2015 The WebRTC project authors. All Rights Reserved.
@@ -71,7 +71,7 @@ class AudioSkin : public AudioSinkInterface {
   std::list<AudioFrame*> audio_frame_list_;
 };
 
-WebRtcAudioMixForRecord::WebRtcAudioMixForRecord(
+WebRtcRecordPlayerMix::WebRtcRecordPlayerMix(
     const rtc::scoped_refptr<webrtc::AudioState>& audio_state,
     webrtc::RtcEventLog* event_log)
     : audio_state_(audio_state),
@@ -93,13 +93,13 @@ WebRtcAudioMixForRecord::WebRtcAudioMixForRecord(
   _hShutdownMixEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
 }
 
-WebRtcAudioMixForRecord::~WebRtcAudioMixForRecord() {
+WebRtcRecordPlayerMix::~WebRtcRecordPlayerMix() {
   Stop();
   delete playsource_;
   delete recordsource_;
 }
 
-void WebRtcAudioMixForRecord::Start() {
+void WebRtcRecordPlayerMix::Start() {
   if (_hMixThread != NULL) {
     return;
   }
@@ -128,7 +128,7 @@ void WebRtcAudioMixForRecord::Start() {
   audio_state()->AddRecordAudioSink(skin_record_);
 }
 
-void WebRtcAudioMixForRecord::Stop() {
+void WebRtcRecordPlayerMix::Stop() {
   {
     rtc::CritScope critScoped(&_critSect);
 
@@ -172,18 +172,18 @@ void WebRtcAudioMixForRecord::Stop() {
   }
 }
 
-internal::AudioState* WebRtcAudioMixForRecord::audio_state() const {
+internal::AudioState* WebRtcRecordPlayerMix::audio_state() const {
   auto* audio_state = static_cast<internal::AudioState*>(audio_state_.get());
   RTC_DCHECK(audio_state);
   return audio_state;
 }
 
-DWORD WINAPI WebRtcAudioMixForRecord::AudioMixThreadFunc(LPVOID context) {
-  return reinterpret_cast<WebRtcAudioMixForRecord*>(context)
+DWORD WINAPI WebRtcRecordPlayerMix::AudioMixThreadFunc(LPVOID context) {
+  return reinterpret_cast<WebRtcRecordPlayerMix*>(context)
       ->AudioMixThreadProcess();
 }
 
-bool WebRtcAudioMixForRecord::AudioMixThreadProcess() {
+bool WebRtcRecordPlayerMix::AudioMixThreadProcess() {
   bool keepMix = true;
 
   // wait time for cache audio data

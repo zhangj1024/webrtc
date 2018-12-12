@@ -270,8 +270,8 @@ rtc_static_library("rtc_audio_video") {
     "engine/webrtcvoicefilestream.h",
     "engine/webrtcinternalfileaudiosource.cc",
     "engine/webrtcinternalfileaudiosource.h",
-    "engine/webrtcrecord.cc",
-    "engine/webrtcrecord.h",
+    "engine/webrtcrecordplayermix.cc",
+    "engine/webrtcrecordplayermix.h",
   ]
 
   if (!build_with_chromium && is_clang) {

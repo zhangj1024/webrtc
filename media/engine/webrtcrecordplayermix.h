@@ -19,12 +19,12 @@ class InternalFileAudioSource;
 
 class AudioSkin;
 
-class WebRtcAudioMixForRecord {
+class WebRtcRecordPlayerMix {
  public:
-  WebRtcAudioMixForRecord(
+  WebRtcRecordPlayerMix(
       const rtc::scoped_refptr<webrtc::AudioState>& audio_state,
       webrtc::RtcEventLog* event_log);
-  ~WebRtcAudioMixForRecord();
+  ~WebRtcRecordPlayerMix();
 
   void Start();
   void Stop();
@@ -36,12 +36,9 @@ class WebRtcAudioMixForRecord {
   rtc::CriticalSection _critSect;
   std::list<AudioFrame*> audio_frame_list_mixed_;
 
-  PushResampler<int16_t> resampler;
-
   internal::AudioState* audio_state() const;
   rtc::scoped_refptr<webrtc::AudioState> audio_state_;
 
-  rtc::AsyncInvoker invoker_;
   rtc::Thread* worker_thread_ = nullptr;
 
   HANDLE _hMixThread = NULL;
@@ -54,7 +51,7 @@ class WebRtcAudioMixForRecord {
   AudioSkin* skin_player_;
   AudioSkin* skin_record_;
 
-  RTC_DISALLOW_IMPLICIT_CONSTRUCTORS(WebRtcAudioMixForRecord);
+  RTC_DISALLOW_IMPLICIT_CONSTRUCTORS(WebRtcRecordPlayerMix);
 };
 }  // namespace webrtc
 

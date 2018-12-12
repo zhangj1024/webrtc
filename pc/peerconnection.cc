@@ -53,7 +53,7 @@
 #include "system_wrappers/include/clock.h"
 #include "system_wrappers/include/field_trial.h"
 #include "system_wrappers/include/metrics.h"
-#include "media/engine/webrtcrecord.h"
+#include "media/engine/webrtcrecordplayermix.h"
 
 using cricket::ContentInfo;
 using cricket::ContentInfos;

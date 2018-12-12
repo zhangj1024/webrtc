@@ -62,8 +62,8 @@ class DegradedCall : public Call, private Transport, private PacketReceiver {
   webrtc::WebRtcVoiceFileStream* CreateFileStream() override;
   void DestroyFileStream(webrtc::AudioReceiveStream* receive_stream) override;
 
-  webrtc::WebRtcAudioMixForRecord* CreateRecord() override;
-  void DestroyRecord(webrtc::WebRtcAudioMixForRecord* record) override;
+  webrtc::WebRtcRecordPlayerMix* CreateRecord() override;
+  void DestroyRecord(webrtc::WebRtcRecordPlayerMix* record) override;
 
   PacketReceiver* Receiver() override;
 
