@@ -33,6 +33,7 @@
 // TODO(zhihuang): This wouldn't be necessary if the interface and
 // implementation of the media engine were in separate build targets.
 #include "media/engine/webrtcmediaengine.h"             // nogncheck
+#include "media/engine/webrtcrecordplayermix.h"
 #include "media/engine/webrtcvideodecoderfactory.h"     // nogncheck
 #include "media/engine/webrtcvideoencoderfactory.h"     // nogncheck
 #include "modules/audio_device/include/audio_device.h"  // nogncheck
@@ -197,6 +198,7 @@ PeerConnectionFactory::~PeerConnectionFactory() {
   // |default_socket_factory_| and |default_network_manager_|.
   default_socket_factory_ = nullptr;
   default_network_manager_ = nullptr;
+  StopAudioMix();
 
   if (wraps_current_thread_)
     rtc::ThreadManager::Instance()->UnwrapCurrentThread();
@@ -327,6 +329,38 @@ bool PeerConnectionFactory::StartAecDump(rtc::PlatformFile file,
 void PeerConnectionFactory::StopAecDump() {
   RTC_DCHECK(signaling_thread_->IsCurrent());
   channel_manager_->StopAecDump();
+}
+
+bool PeerConnectionFactory::StartAudioMix(AudioSinkInterface* cb) {
+  return worker_thread()->Invoke<bool>(RTC_FROM_HERE, [&]() {
+    if (audio_mix_ && audio_mix_->IsRunning()) {
+      audio_mix_->Stop();
+    }
+
+    audio_mix_ = std::make_unique<WebRtcRecordPlayerMix>(
+        channel_manager_->media_engine()->GetAudioState(), nullptr);
+
+    audio_mix_->SetDataCallback(cb);
+    audio_mix_->Start();
+    return true;
+  });
+}
+
+bool PeerConnectionFactory::StopAudioMix() {
+  return worker_thread()->Invoke<bool>(RTC_FROM_HERE, [this] {
+    if (audio_mix_) {
+      if (audio_mix_->IsRunning()) {
+        audio_mix_->Stop();
+      }
+      audio_mix_.reset(nullptr);
+      return true;
+    }
+    return false;
+  });
+}
+
+bool PeerConnectionFactory::AudioMixIsRunning() {
+  return audio_mix_ ? audio_mix_->IsRunning() : false;
 }
 
 rtc::scoped_refptr<PeerConnectionInterface>

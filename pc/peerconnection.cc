@@ -26,7 +26,6 @@
 #include "logging/rtc_event_log/icelogger.h"
 #include "logging/rtc_event_log/output/rtc_event_log_output_file.h"
 #include "logging/rtc_event_log/rtc_event_log.h"
-#include "media/engine/webrtcrecordplayermix.h"
 #include "media/sctp/sctptransport.h"
 #include "pc/audiotrack.h"
 #include "pc/channel.h"
@@ -6424,42 +6423,6 @@ bool PeerConnection::IsPlaying() {
   }
 
   return false;
-}
-
-bool PeerConnection::InitMix(AudioSinkInterface* cb) {
-  return worker_thread()->Invoke<bool>(RTC_FROM_HERE, [&]() {
-    if (record == NULL) {
-      record = call_->CreateRecord();
-    }
-
-    if (record->IsRunning()) {
-      return false;
-    }
-    record->SetDataCallback(cb);
-    return true;
-  });
-}
-
-void PeerConnection::StartMix() {
-  worker_thread()->Invoke<void>(RTC_FROM_HERE, [this] {
-    if (record != NULL) {
-      record->Start();
-    }
-  });
-}
-
-void PeerConnection::StopMix() {
-  worker_thread()->Invoke<void>(RTC_FROM_HERE, [this] {
-    if (record != NULL) {
-      record->SetDataCallback(NULL);
-      call_->DestroyRecord(record);
-    }
-  });
-}
-
-bool PeerConnection::IsMixing() {
-  return worker_thread()->Invoke<bool>(
-      RTC_FROM_HERE, [this] { return record ? record->IsRunning() : false; });
 }
 
 }  // namespace webrtc

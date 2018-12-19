@@ -34,7 +34,6 @@ namespace webrtc {
 class MediaStreamObserver;
 class VideoRtpReceiver;
 class RtcEventLog;
-class WebRtcRecordPlayerMix;
 
 // PeerConnection is the implementation of the PeerConnection object as defined
 // by the PeerConnectionInterface API surface.
@@ -279,11 +278,6 @@ class PeerConnection : public PeerConnectionInternal,
   int64_t GetPlayTotalTime() override;
   bool IsPause() override;
   bool IsPlaying() override;
-
-  bool InitMix(AudioSinkInterface* cb) override;
-  void StartMix() override;
-  void StopMix() override;
-  bool IsMixing() override;
 
  protected:
   ~PeerConnection() override;
@@ -1062,8 +1056,6 @@ class PeerConnection : public PeerConnectionInternal,
   bool enavleVideoReceive_ = true;
   bool enavleAudioSend_ = true;
   bool enavleAudioReceive_ = true;
-
-  WebRtcRecordPlayerMix* record = NULL;
 };
 
 }  // namespace webrtc

@@ -98,6 +98,8 @@ WebRtcRecordPlayerMix::~WebRtcRecordPlayerMix() {
   Stop();
   delete playsource_;
   delete recordsource_;
+  delete sink_player_;
+  delete sink_record_;
 }
 
 void WebRtcRecordPlayerMix::Start() {

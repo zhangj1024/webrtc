@@ -132,6 +132,7 @@ class AudioProcessing;
 class MediaConstraintsInterface;
 class VideoDecoderFactory;
 class VideoEncoderFactory;
+class WebRtcRecordPlayerMix;
 
 // MediaStream container interface.
 class StreamCollectionInterface : public rtc::RefCountInterface {
@@ -1020,11 +1021,6 @@ class PeerConnectionInterface : public rtc::RefCountInterface {
   virtual bool IsPause() = 0;
   virtual bool IsPlaying() = 0;
 
-  virtual bool InitMix(AudioSinkInterface* cb) = 0;
-  virtual void StartMix() = 0;
-  virtual void StopMix() = 0;
-  virtual bool IsMixing() = 0;
-
  protected:
   // Dtor protected as objects shouldn't be deleted via this interface.
   ~PeerConnectionInterface() override = default;
@@ -1318,6 +1314,10 @@ class PeerConnectionFactoryInterface : public rtc::RefCountInterface {
 
   // Stops logging the AEC dump.
   virtual void StopAecDump() = 0;
+
+  virtual bool StartAudioMix(AudioSinkInterface* cb) = 0;
+  virtual bool StopAudioMix() = 0;
+  virtual bool AudioMixIsRunning() = 0;
 
  protected:
   // Dtor and ctor protected as objects shouldn't be created or deleted via

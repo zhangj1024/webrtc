@@ -66,7 +66,6 @@
 #include "video/video_receive_stream.h"
 #include "video/video_send_stream.h"
 #include "media/engine/webrtcvoicefilestream.h"
-#include "media/engine/webrtcrecordplayermix.h"
 
 namespace webrtc {
 
@@ -207,9 +206,6 @@ class Call final : public webrtc::Call,
 
   webrtc::WebRtcVoiceFileStream* CreateFileStream() override;
   void DestroyFileStream(webrtc::AudioReceiveStream* receive_stream) override;
-
-  webrtc::WebRtcRecordPlayerMix* CreateRecord() override;
-  void DestroyRecord(webrtc::WebRtcRecordPlayerMix* receive_stream) override;
 
   RtpTransportControllerSendInterface* GetTransportControllerSend() override;
 
@@ -924,16 +920,6 @@ webrtc::WebRtcVoiceFileStream* Call::CreateFileStream() {
 
 void Call::DestroyFileStream(webrtc::AudioReceiveStream* file_stream) {
   DestroyAudioReceiveStream(file_stream);
-}
-
-webrtc::WebRtcRecordPlayerMix* Call::CreateRecord() {
-  webrtc::WebRtcRecordPlayerMix* record =
-      new WebRtcRecordPlayerMix(config_.audio_state, event_log_);
-  return record;
-}
-
-void Call::DestroyRecord(webrtc::WebRtcRecordPlayerMix* record) {
-  delete record;
 }
 
 RtpTransportControllerSendInterface* Call::GetTransportControllerSend() {

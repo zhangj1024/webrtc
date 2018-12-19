@@ -70,6 +70,11 @@ PROXY_METHOD2(rtc::scoped_refptr<AudioTrackInterface>,
               AudioSourceInterface*)
 PROXY_METHOD2(bool, StartAecDump, rtc::PlatformFile, int64_t)
 PROXY_METHOD0(void, StopAecDump)
+
+PROXY_METHOD1(bool, StartAudioMix, AudioSinkInterface*)
+PROXY_METHOD0(bool, StopAudioMix)
+PROXY_METHOD0(bool, AudioMixIsRunning)
+
 END_PROXY_MAP()
 
 }  // namespace webrtc

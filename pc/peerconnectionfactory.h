@@ -87,6 +87,10 @@ class PeerConnectionFactory : public PeerConnectionFactoryInterface {
   bool StartAecDump(rtc::PlatformFile file, int64_t max_size_bytes) override;
   void StopAecDump() override;
 
+  bool StartAudioMix(AudioSinkInterface* cb) override;
+  bool StopAudioMix() override;
+  bool AudioMixIsRunning() override;
+
   virtual std::unique_ptr<cricket::SctpTransportInternalFactory>
   CreateSctpTransportInternalFactory();
 
@@ -148,6 +152,8 @@ class PeerConnectionFactory : public PeerConnectionFactoryInterface {
       injected_network_controller_factory_;
   std::unique_ptr<NetworkControllerFactoryInterface>
       bbr_network_controller_factory_;
+
+  std::unique_ptr<WebRtcRecordPlayerMix> audio_mix_;
 };
 
 }  // namespace webrtc
