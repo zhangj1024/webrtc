@@ -16,6 +16,7 @@
 #include "rtc_base/ssladapter.h"
 #include "rtc_base/win32socketinit.h"
 #include "rtc_base/win32socketserver.h"
+#include "modules/desktop_capture/win/lyric_render.h"
 
 int PASCAL wWinMain(HINSTANCE instance,
                     HINSTANCE prev_instance,
@@ -25,6 +26,8 @@ int PASCAL wWinMain(HINSTANCE instance,
   rtc::Win32SocketServer w32_ss;
   rtc::Win32Thread w32_thread(&w32_ss);
   rtc::ThreadManager::Instance()->SetCurrentThread(&w32_thread);
+
+  webrtc::LyricRenderInterface::GlobleInit();
 
   rtc::WindowsCommandLineArguments win_args;
   int argc = win_args.argc();
@@ -73,6 +76,7 @@ int PASCAL wWinMain(HINSTANCE instance,
       }
     }
   }
+  webrtc::LyricRenderInterface::GlobleUnInit();
 
   rtc::CleanupSSL();
   return 0;

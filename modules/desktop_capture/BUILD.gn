@@ -314,10 +314,10 @@ rtc_static_library("desktop_capture_generic") {
     "null_capture.h",
     "win_video_capture.cc",
     "win_video_capture.h",
-    "win/lyric_render.cc",
+    "win/lyric_gdi_render.cc",
     "win/lyric_render.h",
-    "win/lyric_prase.cc",
-    "win/lyric_prase.h",
+    "win/lyric_gdi_text.cc",
+    "win/lyric_gdi_text.h",
   ]
 
   if (build_with_mozilla) {

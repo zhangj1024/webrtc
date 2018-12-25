@@ -8,19 +8,16 @@
  *  be found in the AUTHORS file in the root of the source tree.
  */
 
-#include "modules/desktop_capture/win/lyric_render.h"
+#include <fstream>
 #include <list>
+#include <streambuf>
 #include <string>
-#include <fstream>  
-#include <streambuf> 
 #include "api/video/i420_buffer.h"
 #include "api/video/video_frame.h"
 #include "modules/audio_device/include/audio_file_playback.h"
+#include "modules/desktop_capture/win/lyric_gdi_text.h"
+#include "modules/desktop_capture/win/lyric_render.h"
 #include "rtc_base/logging.h"
-#include "third_party/freetype/src/include/ft2build.h"
-#include FT_FREETYPE_H
-#include FT_GLYPH_H
-#include "modules/desktop_capture/win/lyric_prase.h"
 #include "rtc_base/stringutils.h"
 #include "third_party/libyuv/include/libyuv/convert_argb.h"
 #include "third_party/libyuv/include/libyuv/convert_from_argb.h"
@@ -39,6 +36,16 @@ class LyricRender : public LyricRenderInterface {
   bool MaskFrame(const VideoFrame& frame) override;
   void SetDisplay(bool display) override;
   bool IsDisplay() override;
+  void SetOffset(int x, int y) override;
+  void GetOffset(int& x, int& y) override;
+
+  void SetPlayedColor(ColorSetting color) override;
+  void SetNoplayColor(ColorSetting color) override;
+  void SetFont(FontSetting font) override;
+
+  ColorSetting GetPlayedColor() override;
+  ColorSetting GetNoplayColor() override;
+  FontSetting GetFont() override;
 
  protected:
   // PlayCallback
@@ -48,54 +55,36 @@ class LyricRender : public LyricRenderInterface {
 
  private:
   void RenderLine(LyricLine* line,
-                  uint32_t xoffset,
-                  uint32_t yoffset,
-                  uint32_t played_length,
+                  int xoffset,
+                  int yoffset,
+                  int played_length,
                   rtc::scoped_refptr<I420BufferInterface> i420buf);
 
  private:
-  std::list<FT_Glyph> _bitmaps;
   LyricPrase _lyrc_prase;
 
   LyricLine* _playline = NULL;
   LyricLine* _nextline = NULL;
-  uint32_t _played_length = 0;
+  int _played_length = 0;
   volatile bool _display = true;
 
-  uint32_t _xoffset = 10;
-  uint32_t _yoffset = 10;
-  uint32_t _xspace = 5;
-
-  uint8_t _playedY;
-  uint8_t _playedU;
-  uint8_t _playedV;
-
-  uint8_t _Y;
-  uint8_t _U;
-  uint8_t _V;
+  int _line_space = 6;
+  int _xoffset = 0;
+  int _yoffset = 0;
 };
 
 LyricRenderInterface* LyricRenderInterface::Create() {
   return new LyricRender();
 }
 
-LyricRender::LyricRender() {
-  uint8_t R = 255;
-  uint8_t G = 0;
-  uint8_t B = 0;
+void LyricRenderInterface::GlobleInit() {
+  InitGdi();
+}
+void LyricRenderInterface::GlobleUnInit() {
+  UnInitGdi();
+}
 
-  _playedY = ((66 * R + 129 * G + 25 * B) >> 8) + 16;
-  _playedU = ((-38 * R - 74 * G + 112 * B) >> 8) + 128;
-  _playedV = ((112 * R - 94 * G - 18 * B) >> 8) + 128;
-
-  R = 0;
-  G = 0;
-  B = 255;
-
-  _Y = ((66 * R + 129 * G + 25 * B) >> 8) + 16;
-  _U = ((-38 * R - 74 * G + 112 * B) >> 8) + 128;
-  _V = ((112 * R - 94 * G - 18 * B) >> 8) + 128;
-};
+LyricRender::LyricRender(){};
 
 LyricRender::~LyricRender(){};
 
@@ -130,7 +119,7 @@ std::string UTF8_To_string(const std::string& str) {
 }
 
 static const unsigned char KrcKeys[] = {64, 71, 97, 119, 94,  50,  116, 71,
-                              81, 54, 49, 45,  206, 210, 110, 105};
+                                        81, 54, 49, 45,  206, 210, 110, 105};
 
 bool LyricRender::SetKrcLyric(const std::string& file) {
   FILE* pFile = fopen(file.c_str(), "rb");
@@ -166,7 +155,7 @@ bool LyricRender::SetKrcLyric(const std::string& file) {
     delete[] buffer;
     return false;
   }
-  unsigned char* krcData = (unsigned char *)(buffer + 4);
+  unsigned char* krcData = (unsigned char*)(buffer + 4);
   long krcDataLen = lSize - 4;
 
   // XOR 大法解码
@@ -207,10 +196,37 @@ bool LyricRender::MaskFrame(const VideoFrame& frame) {
   RenderLine(_playline, _xoffset, _yoffset, _played_length, i420buf);
 
   if (_nextline != NULL) {
-    RenderLine(_nextline, _xoffset + 5, _yoffset + _playline->_hegiht + 5, 0,
-               i420buf);
+    RenderLine(_nextline, _xoffset, _yoffset + _playline->height + _line_space,
+               0, i420buf);
   }
 
+  return true;
+}
+
+void LyricRender::RenderLine(LyricLine* line,
+                             int xoffset,
+                             int yoffset,
+                             int played_length,
+                             rtc::scoped_refptr<I420BufferInterface> i420buf) {
+  rtc::scoped_refptr<I420Buffer> i420buffer = (I420Buffer*)(i420buf.get());
+
+#ifdef TESTTEST
+  uint8_t R = 255;
+  uint8_t G = 0;
+  uint8_t B = 0;
+
+  uint8_t _playedY = ((66 * R + 129 * G + 25 * B) >> 8) + 16;
+  uint8_t _playedU = ((-38 * R - 74 * G + 112 * B) >> 8) + 128;
+  uint8_t _playedV = ((112 * R - 94 * G - 18 * B) >> 8) + 128;
+
+  for (int h = 0; h < height / 4; h++) {
+    for (int w = 0; w < width / 4; w++) {
+      dataY[h * stride_y + w] = _playedY;
+      dataU[h / 2 * stride_u + w / 2] = _playedU;
+      dataV[h / 2 * stride_v + w / 2] = _playedV;
+    }
+  }
+#endif
 #ifdef TESTTEST
   uint8_t* dst_argb = new uint8_t[width * height * 4];
   memset(dst_argb, 200, width * height * 4);
@@ -219,64 +235,76 @@ bool LyricRender::MaskFrame(const VideoFrame& frame) {
   free(dst_argb);
 #endif
 
-  return true;
-}
+#if 0
+  int x, y;
+  rtc::scoped_refptr<I420Buffer> buffer;
+//   uint8_t* data = line->rgb_data_.get();
 
-void LyricRender::RenderLine(LyricLine* line,
-                             uint32_t xoffset,
-                             uint32_t yoffset,
-                             uint32_t played_length,
-                             rtc::scoped_refptr<I420BufferInterface> i420buf) {
-  played_length += xoffset;
-  uint8_t* dataY = const_cast<uint8_t*>(i420buf->DataY());
-  uint8_t* dataU = const_cast<uint8_t*>(i420buf->DataU());
-  uint8_t* dataV = const_cast<uint8_t*>(i420buf->DataV());
-  const uint32_t width = i420buf->width();
-  const uint32_t height = i420buf->height();
-  const int stride_y = i420buf->StrideY();
-  const int stride_u = i420buf->StrideU();
-  const int stride_v = i420buf->StrideV();
-
-  uint32_t x = 0;
-  uint32_t y = 0;
-
-  for (auto it = line->_words.begin(); it != line->_words.end(); it++) {
-    for (size_t glyph_index = 0; glyph_index < it->glyphs.size();
-         glyph_index++) {
-      FT_Glyph& glyph = it->glyphs.at(glyph_index);
-      FT_BitmapGlyph bitmap_glyph = (FT_BitmapGlyph)glyph;
-      FT_Bitmap& bitmap = bitmap_glyph->bitmap;
-
-      //每个字的高度不一样，已底线为准
-      int yindex = yoffset + it->glyph_height_offsets.at(glyph_index);
-
-      for (uint32_t i = 0; i < bitmap.rows; i++) {
-        y = i + yindex;
-        if (y >= height) {
-          break;
-        }
-
-        for (uint32_t j = 0; j < bitmap.width; j++) {
-          x = j + xoffset;
-          if (x > width) {
-            break;
-          }
-
-          if (bitmap.buffer[i * bitmap.width + j]) {
-            if (x < played_length) {
-              dataY[y * stride_y + x] = _playedY;
-              dataU[y / 2 * stride_u + x / 2] = _playedU;
-              dataV[y / 2 * stride_v + x / 2] = _playedV;
-            } else {
-              dataY[y * stride_y + x] = _Y;
-              dataU[y / 2 * stride_u + x / 2] = _U;
-              dataV[y / 2 * stride_v + x / 2] = _V;
-            }
-          }
-        }
-      }
-      xoffset += bitmap.width + _xspace;
+  for (int lyric_h = 0; lyric_h < line->height; lyric_h++) {
+    y = lyric_h + yoffset;
+    if (y >= i420buf->height()) {
+      break;
     }
+    for (int lyric_w = 0; lyric_w < line->width; lyric_w++) {
+      x = lyric_w + xoffset;
+      if (x > i420buf->width()) {
+        break;
+      }
+      buffer =
+          lyric_w < played_length ? line->buffer_played : line->buffer_noplay;
+
+      dataY[y * i420buf->StrideY() + x] =
+          buffer->DataY()[lyric_h * buffer->StrideY() + lyric_w];
+      dataU[y / 2 * i420buf->StrideU() + x / 2] =
+          buffer->DataU()[lyric_h / 2 * buffer->StrideU() + lyric_w / 2];
+      dataV[y / 2 * i420buf->StrideV() + x / 2] =
+          buffer->DataV()[lyric_h / 2 * buffer->StrideV() + lyric_w / 2];
+    }
+  }
+#endif
+
+  auto copy_online_data = [](rtc::scoped_refptr<I420Buffer> dst, int dst_x,
+                             int dst_y, rtc::scoped_refptr<I420Buffer> src,
+                             int src_x, int src_y, int len) {
+    if (len > (src->width() - src_x))
+      len = (src->width() - src_x);
+
+    if (len > (dst->width() - dst_x))
+      len = (dst->width() - dst_x);
+
+    if (len < 0)
+      return len;
+
+    memcpy(dst->MutableDataY() + dst_y * dst->StrideY() + dst_x,
+           src->DataY() + src_y * src->StrideY() + src_x, len);
+
+    int index_dst_uv = dst_y / 2 * dst->StrideU() + dst_x / 2;
+    int index_src_uv = src_y / 2 * src->StrideU() + src_x / 2;
+    int len_uv = len / 2;
+
+    memcpy(dst->MutableDataU() + index_dst_uv, src->DataU() + index_src_uv,
+           len_uv);
+    memcpy(dst->MutableDataV() + index_dst_uv, src->DataV() + index_src_uv,
+           len_uv);
+
+    return len;
+  };
+
+  int y;
+  int len;
+
+  for (int lyric_h = 0; lyric_h < line->height; lyric_h++) {
+    y = lyric_h + yoffset;
+    if (y >= i420buf->height()) {
+      break;
+    }
+
+    if ((len = copy_online_data(i420buffer, xoffset, y, line->buffer_played, 0,
+                                lyric_h, played_length)) < 0) {
+      continue;
+    }
+    copy_online_data(i420buffer, xoffset + len, y, line->buffer_noplay, len,
+                     lyric_h, line->buffer_noplay->width() - len);
   }
 }
 
@@ -318,33 +346,33 @@ void LyricRender::OnPlayTimer(int64_t cur, int64_t total) {
   uint32_t played_length = 0;
   for (auto lineitr = _playline->_words.begin();
        lineitr != _playline->_words.end(); lineitr++) {
-    uint32_t word_length = 0;
-    for (auto glyphitr = lineitr->glyphs.begin();
-         glyphitr != lineitr->glyphs.end(); glyphitr++) {
-      FT_BitmapGlyph bitmap_glyph = (FT_BitmapGlyph)*glyphitr;
-//       RTC_LOG(LS_ERROR) << lineitr->_word
-//                         << " width:" << bitmap_glyph->bitmap.width;
-      word_length += bitmap_glyph->bitmap.width;
-      if (glyphitr != lineitr->glyphs.begin()) {
-        played_length += _xspace;
-      }
-    }
-
-    if (lineitr != _playline->_words.begin()) {
-      played_length += _xspace;
-    }
+    //     uint32_t word_length = lineitr->width;
+    //     for (auto glyphitr = lineitr->glyphs.begin();
+    //          glyphitr != lineitr->glyphs.end(); glyphitr++) {
+    //       FT_BitmapGlyph bitmap_glyph = (FT_BitmapGlyph)*glyphitr;
+    // //       RTC_LOG(LS_ERROR) << lineitr->_word
+    // //                         << " width:" << bitmap_glyph->bitmap.width;
+    //       word_length += bitmap_glyph->bitmap.width;
+    //       if (glyphitr != lineitr->glyphs.begin()) {
+    //         played_length += _xspace;
+    //       }
+    //     }
+    //
+    //     if (lineitr != _playline->_words.begin()) {
+    //       played_length += _xspace;
+    //     }
 
     if (curtime > (lineitr->_offset + lineitr->_continue)) {
-      played_length += word_length;
+      played_length += lineitr->width;
     } else if (curtime > lineitr->_offset) {
-      played_length += word_length * ((curtime - lineitr->_offset) * 1.0 /
-                                      lineitr->_continue);
+      played_length += lineitr->width * ((curtime - lineitr->_offset) * 1.0 /
+                                         lineitr->_continue);
       break;
     }
   }
 
-//   RTC_LOG(LS_ERROR) << "curtime:" << curtime
-//                     << " played_length:" << played_length;
+  RTC_LOG(LS_ERROR) << "words:" << _playline->_text << " curtime:" << curtime
+                    << " played_length:" << played_length;
 
   _played_length = played_length;
 }
@@ -363,6 +391,40 @@ void LyricRender::SetDisplay(bool display) {
 
 bool LyricRender::IsDisplay() {
   return _display;
+}
+
+void LyricRender::SetOffset(int x, int y) {
+  _xoffset = x / 2 * 2;
+  _yoffset = y / 2 * 2;
+}
+
+void LyricRender::GetOffset(int& x, int& y) {
+  x = _xoffset;
+  y = _yoffset;
+}
+
+void LyricRender::SetPlayedColor(ColorSetting color) {
+  _lyrc_prase.SetPlayedColor(color);
+}
+
+void LyricRender::SetNoplayColor(ColorSetting color) {
+  _lyrc_prase.SetNoplayColor(color);
+}
+
+void LyricRender::SetFont(FontSetting font) {
+  _lyrc_prase.SetFont(font);
+}
+
+ColorSetting LyricRender::GetPlayedColor() {
+  return _lyrc_prase.GetPlayedColor();
+}
+
+ColorSetting LyricRender::GetNoplayColor() {
+  return _lyrc_prase.GetNoplayColor();
+}
+
+FontSetting LyricRender::GetFont() {
+  return _lyrc_prase.GetFont();
 }
 
 }  // namespace webrtc

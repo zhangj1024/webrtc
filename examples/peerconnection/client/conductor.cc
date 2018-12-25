@@ -594,17 +594,27 @@ void Conductor::OnSuccess(webrtc::SessionDescriptionInterface* desc) {
 //   peer_connection_->AddPlayCallback(this);
   peer_connection_->AddFileStream(std::string("F://bucai.pcm"));
 
-//   char path[] = "F://bucai.krc";
+//  char path[] = "F://bucai.krc";
 
-//   lyric->SetKrcLyric(path);
+//  lyric->SetKrcLyric(path);
 //   lyric->SetDisplay(false);
 //   lyric->SetDisplay(true);
 
-//   capture->AddOrUpdateLyric(lyric);
+//  lyric->SetOffset(500, 445);
+//  webrtc::ColorSetting color;
+//  color.color = 0x0000A0;
+//  lyric->SetNoplayColor(color);
+
+//  color.color = 0x06F200;
+//  lyric->SetPlayedColor(color);
+
+  //图片数据 回调 给歌词，做混屏
+//  capture->AddOrUpdateLyric(lyric);
+  //播放进度 回调 给歌词，设置歌词的显示时间
 //   peer_connection_->AddPlayCallback(lyric);
 //   peer_connection_->PauseFileStream(true);
 //   peer_connection_->PauseFileStream(false);
-//   peer_connection_->SetPlayTime(260 * 1000);
+//   peer_connection_->SetPlayTime(26 * 1000);
 //   RTC_LOG(LS_ERROR) << "GetPlayTotalTime:" <<
 //   peer_connection_->GetPlayTotalTime();
 //
