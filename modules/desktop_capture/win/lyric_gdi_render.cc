@@ -25,6 +25,11 @@
 
 namespace webrtc {
 
+FontSetting::FontSetting() = default;
+FontSetting::FontSetting(const FontSetting& other) = default;
+FontSetting::FontSetting(FontSetting&& other) = default;
+FontSetting::~FontSetting() = default;
+
 class LyricRender : public LyricRenderInterface {
  public:
   LyricRender();

@@ -20,6 +20,11 @@ namespace webrtc {
 
 class FontSetting {
  public:
+  FontSetting();
+  FontSetting(const FontSetting& other);
+  FontSetting(FontSetting&& other);
+  ~FontSetting();
+
   std::string face;
   std::string face_style;
   int face_size = 0;

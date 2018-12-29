@@ -240,8 +240,8 @@ bool WebRtcRecordPlayerMix::AudioMixThreadProcess() {
       recordsource_->SetFrame(sink_record_->GetFrame());
       playsource_->SetFrame(sink_player_->GetFrame());
     }
-    AudioFrame* audio_frame = new AudioFrame();
-    audio_mixer->Mix(kRecordingNumChannels, audio_frame);
+    std::unique_ptr<AudioFrame> audio_frame = std::make_unique<AudioFrame>();
+    audio_mixer->Mix(kRecordingNumChannels, audio_frame.get());
     audio_frame->timestamp_ = ts;
     ts += 10;
 
